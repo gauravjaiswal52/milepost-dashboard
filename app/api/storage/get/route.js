@@ -1,5 +1,4 @@
-import { sql } from '@vercel/postgres';
-import { ensureTable } from '../../../../lib/db';
+import { sql, ensureTable } from '../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 
