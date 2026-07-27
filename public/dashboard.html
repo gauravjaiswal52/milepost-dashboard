@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MILEPOST — Project Tracking Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c141f;
+  --panel:#121d2b;
+  --panel-2:#17253670;
+  --panel-solid:#172536;
+  --hairline:#25384d;
+  --hairline-soft:#1c2c3f;
+  --text:#e7edf3;
+  --muted:#8ea0b3;
+  --muted-2:#5d7288;
+  --green:#3ecf8e;
+  --green-dim:#3ecf8e26;
+  --red:#ff5d5d;
+  --red-dim:#ff5d5d24;
+  --amber:#f5b841;
+  --amber-dim:#f5b84124;
+  --teal:#35b3c7;
+  --teal-dim:#35b3c724;
+  --radius:10px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(ellipse at top left, #0f1c2b 0%, var(--bg) 45%),
+    var(--bg);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+}
+::selection{background:var(--amber-dim);color:var(--text);}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.wrap{max-width:1440px;margin:0 auto;padding:28px 32px 80px;}
+
+/* ---------- Header ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-bottom:22px;margin-bottom:22px;border-bottom:1px solid var(--hairline);
+  gap:20px;flex-wrap:wrap;
+}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand-mark{
+  width:40px;height:40px;border-radius:8px;
+  background:linear-gradient(150deg,#1c2c3f,#101a26);
+  border:1px solid var(--hairline);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.brand-mark::before{
+  content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(90deg, var(--amber) 0 2px, transparent 2px 8px);
+  opacity:.55; top:18px; height:2px;
+}
+.brand-mark svg{position:relative;z-index:1;}
+.brand h1{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:.5px;margin:0;}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:12.5px;letter-spacing:.3px;}
+.nav{display:flex;gap:6px;background:var(--panel);border:1px solid var(--hairline);border-radius:10px;padding:4px;}
+.nav button{
+  border:none;background:transparent;color:var(--muted);
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;
+  padding:9px 16px;border-radius:7px;cursor:pointer;letter-spacing:.2px;
+  display:flex;align-items:center;gap:7px;transition:background .15s,color .15s;
+}
+.nav button:hover{color:var(--text);}
+.nav button.active{background:var(--hairline-soft);color:var(--amber);}
+.nav .badge{
+  background:var(--red);color:#1a0000;font-size:10px;font-weight:700;
+  border-radius:20px;padding:1px 6px;font-family:'IBM Plex Mono',monospace;
+}
+.sync-status{display:flex;align-items:center;gap:10px;color:var(--muted-2);font-size:11.5px;font-family:'IBM Plex Mono',monospace;}
+
+/* ---------- Panels / generic ---------- */
+.panel{
+  background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius);
+  padding:20px 22px;
+}
+.panel + .panel{margin-top:16px;}
+.section-title{
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14.5px;
+  letter-spacing:.3px;margin:0 0 14px;display:flex;align-items:center;gap:10px;color:var(--text);
+}
+.section-title .tag{
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted-2);
+  border:1px solid var(--hairline);padding:2px 8px;border-radius:20px;
+}
+.btn{
+  font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;
+  border-radius:7px;padding:9px 15px;cursor:pointer;border:1px solid var(--hairline);
+  background:var(--hairline-soft);color:var(--text);transition:all .15s;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn:hover{border-color:var(--amber);color:var(--amber);}
+.btn.primary{background:var(--amber);color:#231400;border-color:var(--amber);}
+.btn.primary:hover{background:#ffc966;color:#231400;}
+.confirm-box .btn.danger{background:var(--red);color:#2a0000;border-color:var(--red);}
+.confirm-box .btn.danger:hover{background:#ff7d7d;color:#2a0000;}
+.btn.ghost{background:transparent;}
+.btn.small{padding:6px 10px;font-size:12px;}
+.btn.danger:hover{border-color:var(--red);color:var(--red);}
+
+input,select,textarea{
+  background:#0e1720;border:1px solid var(--hairline);color:var(--text);
+  border-radius:7px;padding:8px 10px;font-family:'Inter',sans-serif;font-size:13px;
+  outline:none;transition:border-color .15s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--amber);}
+label{font-size:11.5px;color:var(--muted);letter-spacing:.3px;text-transform:uppercase;font-weight:600;display:block;margin-bottom:5px;}
+.field{margin-bottom:14px;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* ---------- Filter bar ---------- */
+.filterbar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:18px;}
+.filterbar .field{margin-bottom:0;min-width:140px;}
+.filterbar input[type=text]{min-width:190px;}
+.filterbar .spacer{flex:1;}
+
+.msel{position:relative;min-width:150px;}
+.msel-btn{
+  width:100%;text-align:left;background:#0e1720;border:1px solid var(--hairline);color:var(--text);
+  border-radius:7px;padding:8px 10px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;
+  display:flex;align-items:center;justify-content:space-between;gap:6px;transition:border-color .15s;
+}
+.msel-btn:hover{border-color:var(--amber);}
+.msel-caret{color:var(--muted-2);font-size:10px;}
+.msel-panel{
+  display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:220px;max-height:280px;overflow:auto;
+  background:var(--panel-solid);border:1px solid var(--hairline);border-radius:8px;padding:8px;
+  box-shadow:0 14px 34px #00000070;z-index:20;
+}
+.msel-panel.open{display:block;}
+.msel-row-actions{display:flex;justify-content:flex-end;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid var(--hairline-soft);}
+.msel-mini{background:transparent;border:none;color:var(--amber);font-size:11px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-weight:600;}
+.msel-opt{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:6px 4px;border-radius:5px;cursor:pointer;white-space:nowrap;}
+.msel-opt:hover{background:var(--hairline-soft);}
+.msel-opt input{width:14px;height:14px;flex-shrink:0;}
+
+/* ---------- Table ---------- */
+table{width:100%;border-collapse:collapse;}
+th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--muted-2);font-weight:600;padding:0 12px 10px;border-bottom:1px solid var(--hairline);
+  white-space:nowrap;
+}
+th.sortable{cursor:pointer;user-select:none;transition:color .15s;}
+th.sortable:hover{color:var(--amber);}
+.sort-arrow{display:inline-block;margin-left:4px;font-size:9px;}
+.sort-arrow.idle{color:var(--muted-2);opacity:.5;}
+.sort-arrow.active{color:var(--amber);opacity:1;}
+td{padding:14px 12px;border-bottom:1px solid var(--hairline-soft);vertical-align:middle;font-size:13px;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:#0f1a26;}
+.pname{font-weight:600;color:var(--text);}
+.psub{color:var(--muted-2);font-size:11.5px;margin-top:2px;}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;
+  font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;letter-spacing:.2px;
+}
+.pill.on{background:var(--green-dim);color:var(--green);}
+.pill.off{background:var(--red-dim);color:var(--red);}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.wf-pill{font-size:10.5px;padding:2px 8px;border-radius:5px;border:1px solid var(--hairline);color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.type-pill{font-size:10.5px;padding:2px 8px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-weight:600;letter-spacing:.3px;}
+.type-pill.type-Dx{background:var(--teal-dim);color:var(--teal);}
+.type-pill.type-Tx{background:var(--amber-dim);color:var(--amber);}
+.type-pill.type-Both{background:#9b6ef324;color:#b18df2;}
+.slip-tag{font-size:10px;color:var(--red);margin-top:2px;}
+.slip-tag.early{color:var(--green);}
+
+/* Stage rail — signature element */
+.rail{display:flex;align-items:center;gap:2px;position:relative;padding:6px 0;}
+.tie{
+  width:9px;height:20px;border-radius:2px;background:#1c2c3f;position:relative;flex-shrink:0;
+  transition:transform .1s;
+}
+.tie.done{background:var(--muted-2);}
+.tie.current.on{background:var(--green);box-shadow:0 0 8px 1px var(--green-dim);}
+.tie.current.off{background:var(--red);box-shadow:0 0 8px 1px var(--red-dim);}
+.tie:hover{transform:scaleY(1.15);}
+.tie .tip{
+  position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+  background:#0a121b;border:1px solid var(--hairline);padding:6px 9px;border-radius:6px;
+  font-size:11px;white-space:nowrap;display:none;z-index:5;font-family:'IBM Plex Mono',monospace;
+  box-shadow:0 8px 20px #00000060;
+}
+.tie:hover .tip{display:block;}
+.tip .tname{color:var(--text);font-weight:600;font-family:'Inter',sans-serif;margin-bottom:2px;}
+.tip .trange{color:var(--muted);}
+
+.blocker-tag{font-size:11px;color:var(--muted);}
+
+.manual-status-sel{font-size:12px;padding:6px 8px;border-radius:6px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+.manual-status-sel.manual-on{background:var(--green-dim);color:var(--green);border-color:var(--green);}
+.manual-status-sel.manual-off{background:var(--red-dim);color:var(--red);border-color:var(--red);}
+.manual-status-sel.manual-unset{color:var(--muted-2);}
+
+.progress-sel{font-size:12px;padding:6px 8px;border-radius:6px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+.progress-sel.progress-done{background:var(--teal-dim);color:var(--teal);border-color:var(--teal);}
+.progress-sel.progress-active{color:var(--muted);}
+.completed-tag{font-size:10px;margin-top:5px;font-family:'IBM Plex Mono',monospace;white-space:nowrap;}
+.completed-tag.on{color:var(--green);}
+.completed-tag.off{color:var(--red);}
+.blocker-tag b{color:var(--amber);font-family:'IBM Plex Mono',monospace;}
+.actions-cell{display:flex;gap:6px;}
+.icon-btn{
+  background:transparent;border:1px solid var(--hairline);color:var(--muted);
+  width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.icon-btn:hover{border-color:var(--amber);color:var(--amber);}
+
+.empty-row td{text-align:center;color:var(--muted-2);padding:40px;font-size:13px;}
+
+/* ---------- Modal ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:#04080ccc;backdrop-filter:blur(3px);
+  display:none;align-items:flex-start;justify-content:center;z-index:100;padding:40px 20px;overflow:auto;
+}
+.modal-backdrop.show{display:flex;}
+.modal{
+  background:var(--panel-solid);border:1px solid var(--hairline);border-radius:12px;
+  width:100%;max-width:640px;padding:24px 26px;box-shadow:0 30px 80px #00000080;
+  max-height:90vh;overflow:auto;
+}
+.modal h2{font-family:'Space Grotesk',sans-serif;font-size:18px;margin:0 0 4px;}
+.modal .modal-sub{color:var(--muted);font-size:12.5px;margin:0 0 18px;}
+.modal-close{float:right;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px;}
+
+.toast-container{
+  position:fixed;bottom:22px;right:22px;z-index:200;
+  display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  pointer-events:none;
+}
+.toast{
+  pointer-events:auto;
+  background:var(--panel-solid);border:1px solid var(--hairline);border-left:3px solid var(--muted-2);
+  border-radius:8px;padding:10px 16px;font-size:12.5px;color:var(--text);
+  box-shadow:0 10px 28px #00000060;max-width:340px;
+  opacity:0;transform:translateY(8px);transition:opacity .2s ease, transform .2s ease;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.toast-success{border-left-color:var(--green);}
+.toast.toast-error{border-left-color:var(--red);}
+.toast .toast-icon{font-family:'IBM Plex Mono',monospace;font-weight:700;flex-shrink:0;}
+.toast.toast-success .toast-icon{color:var(--green);}
+.toast.toast-error .toast-icon{color:var(--red);}
+
+.confirm-backdrop{
+  position:fixed;inset:0;background:#04080ccc;backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;z-index:300;padding:20px;
+}
+.confirm-box{
+  background:var(--panel-solid);border:1px solid var(--hairline);border-radius:12px;
+  padding:22px 24px;max-width:420px;width:100%;box-shadow:0 30px 80px #00000080;
+}
+.confirm-msg{margin:0 0 18px;font-size:13.5px;line-height:1.6;color:var(--text);}
+.confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--hairline-soft);}
+
+/* stage-edit rows in modal */
+.stage-edit-row{
+  display:grid;grid-template-columns:1.3fr 1fr 1fr auto;gap:10px;align-items:center;
+  padding:9px 0;border-bottom:1px solid var(--hairline-soft);
+}
+.stage-edit-row:last-child{border-bottom:none;}
+.stage-edit-row .sname{font-size:12.5px;font-weight:600;}
+.stage-edit-row .sname .team{display:block;color:var(--muted-2);font-weight:400;font-size:10.5px;margin-top:1px;font-family:'IBM Plex Mono',monospace;}
+.parallel-toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;}
+.parallel-toggle input{width:14px;height:14px;}
+
+.pending-note{
+  background:var(--amber-dim);border:1px solid #f5b84150;color:var(--amber);
+  font-size:11.5px;padding:8px 11px;border-radius:7px;margin-top:8px;line-height:1.5;
+}
+
+/* ---------- Summary module ---------- */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+@media(max-width:1000px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+.kpi-row{display:flex;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+.kpi{
+  flex:1;min-width:150px;background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius);
+  padding:16px 18px;
+}
+.kpi .val{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;}
+.kpi .lbl{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;margin-top:4px;}
+.kpi.green .val{color:var(--green);}
+.kpi.red .val{color:var(--red);}
+.kpi.amber .val{color:var(--amber);}
+
+.barchart-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.barchart-row .label{width:120px;font-size:12px;color:var(--muted);flex-shrink:0;}
+.barchart-track{flex:1;height:20px;background:#0e1720;border-radius:4px;overflow:hidden;display:flex;}
+.barchart-seg{height:100%;display:flex;align-items:center;}
+.barchart-count{width:34px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);flex-shrink:0;}
+
+.stacked-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.stacked-legend span{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);}
+.stacked-legend .sw{width:9px;height:9px;border-radius:2px;}
+
+.month-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.month-card{background:#0e1720;border:1px solid var(--hairline-soft);border-radius:8px;padding:12px;}
+.month-card .m{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted);margin-bottom:8px;}
+.month-card .row{display:flex;justify-content:space-between;font-size:12px;margin-top:4px;}
+
+.team-block-card{background:#0e1720;border:1px solid var(--hairline-soft);border-radius:8px;padding:14px;margin-bottom:10px;}
+.team-block-card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.team-block-card .name{font-weight:600;font-size:13.5px;}
+.team-block-card .count{font-family:'IBM Plex Mono',monospace;color:var(--red);font-weight:700;}
+.hist-bar-bg{height:6px;background:#182534;border-radius:3px;overflow:hidden;}
+.hist-bar-fill{height:100%;background:var(--red);}
+
+/* ---------- Team load module ---------- */
+.team-card{
+  background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius);padding:20px;
+}
+.team-card .thead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+.team-card h3{font-family:'Space Grotesk',sans-serif;margin:0;font-size:16px;}
+.team-card .stages{color:var(--muted);font-size:11.5px;margin-top:4px;line-height:1.6;}
+.team-card .stat{text-align:right;}
+.team-card .stat .n{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:var(--teal);}
+.team-card .stat .l{font-size:10.5px;color:var(--muted-2);text-transform:uppercase;}
+.team-proj-list{margin-top:10px;border-top:1px solid var(--hairline-soft);padding-top:10px;}
+.team-proj-row{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;color:var(--muted);}
+.team-proj-row b{color:var(--text);font-weight:500;}
+.team-proj-row .lm{font-family:'IBM Plex Mono',monospace;color:var(--muted-2);}
+.team-proj-row .st{font-size:10.5px;color:var(--amber);font-family:'IBM Plex Mono',monospace;}
+
+.month-forecast-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.forecast-month{background:#0e1720;border:1px solid var(--hairline-soft);border-radius:8px;padding:12px 14px;}
+.forecast-month .fm-head{display:flex;justify-content:space-between;align-items:baseline;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);margin-bottom:8px;border-bottom:1px solid var(--hairline-soft);padding-bottom:8px;}
+.forecast-month .fm-total{color:var(--muted-2);font-size:10.5px;}
+.forecast-month .fm-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;gap:6px;}
+.forecast-month .fm-row b{font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.forecast-month .fm-stage{color:var(--muted);font-size:10.5px;flex-shrink:0;}
+.forecast-month .fm-lms{color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:11px;flex-shrink:0;}
+
+/* Approvals */
+.approval-card{
+  background:#0e1720;border:1px solid var(--hairline-soft);border-radius:8px;padding:14px 16px;margin-bottom:10px;
+  display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.approval-card .info b{font-family:'Space Grotesk',sans-serif;}
+.approval-card .diff{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);margin-top:4px;}
+.approval-card .diff .old{color:var(--red);text-decoration:line-through;opacity:.7;}
+.approval-card .diff .new{color:var(--green);}
+.approval-actions{display:flex;gap:8px;}
+
+.footer-note{margin-top:26px;color:var(--muted-2);font-size:11.5px;text-align:center;line-height:1.6;}
+
+.readme-stage-list{display:flex;flex-wrap:wrap;gap:8px;}
+.readme-stage-chip{
+  background:#0e1720;border:1px solid var(--hairline-soft);border-radius:20px;padding:6px 12px;
+  font-size:12px;color:var(--text);display:flex;align-items:center;gap:6px;
+}
+.readme-stage-team{color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:10.5px;}
+.readme-block{font-size:13px;line-height:1.7;color:var(--muted);padding:8px 0;border-bottom:1px solid var(--hairline-soft);}
+.readme-block:last-child{border-bottom:none;}
+.readme-block b{color:var(--text);}
+.settings-panel textarea{width:100%;}
+.stage-dur-row{display:grid;grid-template-columns:1fr 90px 130px;gap:10px;align-items:center;padding:6px 0;}
+.stage-dur-row .n{font-size:12.5px;}
+
+.rule-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+.rule-card{background:#0e1720;border:1px solid var(--hairline-soft);border-radius:8px;padding:14px 16px;}
+.rule-card-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--hairline-soft);}
+.rule-card-title{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;}
+.rule-card-head select{font-size:12px;padding:5px 8px;}
+.rule-row-label{font-size:10.5px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+.rule-mult-grid{display:grid;gap:8px;}
+.rule-mult-grid-3{grid-template-columns:repeat(3,1fr);}
+.rule-mult-grid-6{grid-template-columns:repeat(3,1fr);}
+@media(min-width:1300px){.rule-mult-grid-6{grid-template-columns:repeat(6,1fr);}}
+.rule-mult-cell label{font-size:9.5px;color:var(--muted-2);margin-bottom:3px;text-transform:none;font-weight:400;display:block;}
+.rule-mult-cell input{width:100%;padding:5px 7px;font-size:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 14 L18 6" stroke="#f5b841" stroke-width="1.6"/><circle cx="4" cy="13.1" r="1.6" fill="#3ecf8e"/><circle cx="10" cy="10" r="1.6" fill="#f5b841"/><circle cx="16" cy="6.9" r="1.6" fill="#ff5d5d"/></svg>
+      </div>
+      <div>
+        <h1>MILEPOST</h1>
+        <p>Project delivery tracker · stage-by-stage, mile by mile</p>
+      </div>
+    </div>
+    <div class="nav" id="nav">
+      <button data-tab="tracker" class="active">Tracker</button>
+      <button data-tab="summary">Summary</button>
+      <button data-tab="teamload">Team Load</button>
+      <button data-tab="archive">Archive</button>
+      <button data-tab="settings">Settings</button>
+      <button data-tab="readme">Read Me</button>
+    </div>
+    <div class="sync-status">
+      <span id="refreshLabel">Loading…</span>
+      <button class="btn ghost small" id="btnRefreshNow" title="Pull the latest from everyone">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div id="tab-tracker"></div>
+  <div id="tab-summary" style="display:none"></div>
+  <div id="tab-teamload" style="display:none"></div>
+  <div id="tab-archive" style="display:none"></div>
+  <div id="tab-settings" style="display:none"></div>
+  <div id="tab-readme" style="display:none"></div>
+
+  <div class="footer-note">This data is shared — anyone with this link can see and edit it. Each project saves independently, so different people editing different projects won't overwrite each other; editing the exact same project at the same moment will prompt whoever saves second. Use "↻ Refresh" (or wait ~20s for auto-refresh) to pull in others' changes.</div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop"><div class="modal" id="modalBody"></div></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// Storage shim: same get/set/delete/list signatures as the Claude-artifact window.storage API,
+// but backed by real API routes -> Postgres, so this works as a standalone hosted app.
+// SHARED param is accepted for signature compatibility but ignored (this app only ever
+// used shared:true — a single shared workspace — so there's nothing to branch on here).
+window.storage = {
+  async list(prefix, shared){
+    const r = await fetch('/api/storage/list?prefix=' + encodeURIComponent(prefix || ''));
+    if(!r.ok) throw new Error('Storage list failed: ' + r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    return { keys: data.keys };
+  },
+  async get(key, shared){
+    const r = await fetch('/api/storage/get?key=' + encodeURIComponent(key));
+    if(!r.ok) throw new Error('Storage get failed: ' + r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    if(data.value === null || data.value === undefined) return null;
+    return { key, value: data.value };
+  },
+  async set(key, value, shared){
+    const r = await fetch('/api/storage/set', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ key, value })
+    });
+    if(!r.ok) throw new Error('Storage set failed: ' + r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    return { key, value };
+  },
+  async delete(key, shared){
+    const r = await fetch('/api/storage/delete', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ key })
+    });
+    if(!r.ok) throw new Error('Storage delete failed: ' + r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    return { key, deleted: true };
+  }
+};
+</script>
+<script>
+/* ============================== CONFIG / CONSTANTS ============================== */
+const STAGES = [
+  {id:'pre_correction', name:'Pre-Correction', abbr:'PC', team:'AIDataOps', duration:3},
+  {id:'correction', name:'Correction', abbr:'COR', team:'AIDataOps', duration:5},
+  {id:'imagery_dsm_download', name:'Imagery/DSM Download', abbr:'DL', team:'SE', duration:2},
+  {id:'imagery_dsm_ingestion', name:'Imagery/DSM Ingestion', abbr:'ING', team:'SE', duration:2},
+  {id:'tg_run', name:'TG Run', abbr:'TGR', team:'SE', duration:4},
+  {id:'sampling_labelling', name:'Sampling/Labelling', abbr:'SAM', team:'AIDataOps', duration:6},
+  {id:'decisioning_modelrun', name:'Decisioning/ModelRun', abbr:'DEC', team:'DS', duration:4},
+  {id:'tg_cleaning', name:'TG Cleaning', abbr:'TGC', team:'AIDataOps', duration:3},
+  {id:'ingestion_height_tagging', name:'Ingestion-Height Tagging', abbr:'HT', team:'SE', duration:5},
+  {id:'analysis', name:'Analysis', abbr:'ANL', team:'BA', duration:4},
+  {id:'ivms_upload', name:'IVMS Upload', abbr:'IVM', team:'FS', duration:2},
+];
+const TEAMS = ['AIDataOps','Platform','DS','SE','BA','FS','CSM'];
+const WORKFLOWS = ['New','Old'];
+const PROJECT_TYPES = ['Dx','Tx','Both']; // Distribution / Transmission / Both
+const MANUAL_STATUS_OPTIONS = ['On-track','Off-track']; // EM/PM self-reported; blank = not yet set
+const PROGRESS_STATUSES = ['In Progress','Completed'];
+
+// Buckets a project into one of three states for filtering/sorting: still running, or
+// completed (split by whether it was on-track at the moment it was marked complete).
+function getProgressBucket(p){
+  if(p.progressStatus!=='Completed') return 'in_progress';
+  return p.completedOnTrack ? 'completed_on' : 'completed_off';
+}
+
+// LM bands for duration scaling. Each band gets its own multiplier per stage, editable in Settings.
+const LMS_BANDS = [
+  {id:'b1', label:'< 500'},
+  {id:'b2', label:'500 – 1,000'},
+  {id:'b3', label:'1,000 – 5,000'},
+  {id:'b4', label:'5,000 – 10,000'},
+  {id:'b5', label:'10,000 – 25,000'},
+  {id:'b6', label:'> 25,000'},
+];
+function getLmsBand(lms){
+  if(lms < 500) return 'b1';
+  if(lms < 1000) return 'b2';
+  if(lms < 5000) return 'b3';
+  if(lms < 10000) return 'b4';
+  if(lms < 25000) return 'b5';
+  return 'b6';
+}
+function defaultLmsMult(){
+  return {b1:1, b2:1.1, b3:1.25, b4:1.45, b5:1.7, b6:2};
+}
+
+const STAGE_BY_ID = Object.fromEntries(STAGES.map(s=>[s.id,s]));
+const stageIndex = id => STAGES.findIndex(s=>s.id===id);
+
+const todayISO = () => new Date().toISOString().slice(0,10);
+const TODAY = todayISO();
+
+function uid(prefix){ return prefix+'_'+Math.random().toString(36).slice(2,9); }
+function addDays(iso, n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+
+// Every "days" figure in Settings/scheduling is BUSINESS days (Mon-Fri) — weekends don't count
+// as elapsed duration. These are the only two places that logic lives; everything downstream
+// (computeStageDates, computeEstimatedEdd) just calls these instead of the calendar-day versions.
+function isWeekend(iso){ const day = new Date(iso+'T00:00:00').getDay(); return day===0 || day===6; }
+function addBusinessDays(iso, n){
+  let d = new Date(iso+'T00:00:00');
+  const step = n>=0 ? 1 : -1;
+  let remaining = Math.abs(n);
+  while(remaining>0){
+    d.setDate(d.getDate()+step);
+    const day = d.getDay();
+    if(day!==0 && day!==6) remaining--;
+  }
+  return d.toISOString().slice(0,10);
+}
+// Signed count of business days between two ISO dates (0 if equal).
+function businessDaysBetween(a, b){
+  if(a===b) return 0;
+  const step = a<b ? 1 : -1;
+  let count = 0;
+  let d = new Date(a+'T00:00:00');
+  const target = new Date(b+'T00:00:00').getTime();
+  while(d.getTime() !== target){
+    d.setDate(d.getDate()+step);
+    const day = d.getDay();
+    if(day!==0 && day!==6) count += step;
+  }
+  return count;
+}
+function fmtDate(iso){ if(!iso) return '—'; const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function monthKey(iso){ const d=new Date(iso+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',year:'numeric'}); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ============================== STATE ============================== */
+// SHARED = true: this data lives in shared storage, visible to anyone who opens this artifact —
+// suitable for a small trusted team (2-3 people), not a public/anonymous audience.
+const SHARED = true;
+
+let STATE = {
+  config: {
+    stageRules: Object.fromEntries(STAGES.map(s=>[s.id, {base:s.duration, mult:{Dx:1, Tx:1.15, Both:1.3}, lmsMult:defaultLmsMult()}])),
+    teamMap: Object.fromEntries(STAGES.map(s=>[s.id,s.team])),
+  },
+  projects: [],
+  blockerHistory: [], // {id, projectId, team, date}
+};
+let filters = { em:[], workflow:[], stage:[], track:[], blocker:[], type:[], manual:[], q:'' };
+let archiveFilters = { em:[], workflow:[], type:[], completedStatus:[], q:'' };
+let sortState = { key: null, dir: 'asc' };
+let archiveSortState = { key: null, dir: 'asc' };
+let openMultiselect = null; // which filter's dropdown panel is currently open, if any (shared — only one tab is visible at a time)
+let selectedProjectIds = new Set(); // for bulk delete
+
+// Closes any open multiselect dropdown when clicking outside it. Attached once, globally —
+// re-querying the DOM each time means it still works after any tab rebuilds its table.
+document.addEventListener('click', (e)=>{
+  if(openMultiselect && !e.target.closest('.msel')){
+    openMultiselect = null;
+    document.querySelectorAll('.msel-panel.open').forEach(p=>p.classList.remove('open'));
+  }
+});
+
+// Generic multi-select widget: works against whatever filter-state object is passed in, so
+// both the Tracker and Archive filter bars can share the exact same rendering/wiring code
+// without their dropdowns colliding.
+function renderMultiselect(filtersObj, key, label, options){
+  const selected = filtersObj[key];
+  const countLabel = selected.length===0 ? 'All' : `${selected.length} selected`;
+  return `
+    <div class="msel field">
+      <label>${label}</label>
+      <button type="button" class="msel-btn" data-msel="${key}">${countLabel}<span class="msel-caret">▾</span></button>
+      <div class="msel-panel ${openMultiselect===key?'open':''}" data-msel-panel="${key}">
+        <div class="msel-row-actions"><button type="button" class="msel-mini" data-msel-clear="${key}">Clear</button></div>
+        ${options.map(o=>{
+          const checked = selected.includes(o.value);
+          return `<label class="msel-opt"><input type="checkbox" data-msel-opt="${key}" value="${escapeHtml(o.value)}" ${checked?'checked':''}> ${escapeHtml(o.label)}</label>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+function wireMultiselects(root, filtersObj, rerender){
+  root.querySelectorAll('.msel-btn').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const key = btn.dataset.msel;
+      openMultiselect = (openMultiselect===key) ? null : key;
+      rerender();
+    };
+  });
+  root.querySelectorAll('[data-msel-opt]').forEach(cb=>{
+    cb.onclick = (e)=>e.stopPropagation();
+    cb.onchange = ()=>{
+      const key = cb.dataset.mselOpt;
+      const val = cb.value;
+      const arr = filtersObj[key];
+      if(cb.checked){ if(!arr.includes(val)) arr.push(val); }
+      else { filtersObj[key] = arr.filter(v=>v!==val); }
+      openMultiselect = key;
+      rerender();
+    };
+  });
+  root.querySelectorAll('[data-msel-clear]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      filtersObj[btn.dataset.mselClear] = [];
+      openMultiselect = btn.dataset.mselClear;
+      rerender();
+    };
+  });
+}
+let activeTab = 'tracker';
+let lastRefreshedAt = null;
+
+/* ============================== PERSISTENCE ==============================
+   Projects each live under their OWN key — that's what lets two people edit two
+   different projects without colliding. Rules and history are lower-frequency,
+   edited-together data, so they're each combined into ONE key rather than fanned
+   out — fewer, more reliable storage calls. All bulk writes go through a small
+   retry-with-backoff helper and run one at a time (not Promise.all-in-parallel),
+   since firing a burst of simultaneous writes is what tends to trip storage's
+   internal rate limits and surface as "Internal server error." */
+
+function sleep(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+async function withRetry(fn, retries=2, baseDelay=350){
+  let lastErr;
+  for(let i=0;i<=retries;i++){
+    try{ return await fn(); }
+    catch(e){ lastErr = e; if(i<retries) await sleep(baseDelay*(i+1)); }
+  }
+  throw lastErr;
+}
+
+async function listKeys(prefix){
+  try{
+    const r = await withRetry(()=>window.storage.list(prefix, SHARED), 2, 300);
+    return (r && r.keys) ? r.keys : [];
+  }catch(e){ console.log('List failed after retries:', e && e.message); return []; }
+}
+async function getJson(key){
+  try{
+    const r = await withRetry(()=>window.storage.get(key, SHARED), 2, 300);
+    return (r && r.value) ? JSON.parse(r.value) : null;
+  }catch(e){
+    console.log('Read failed after retries for', key, ':', e && e.message);
+    return {__readFailed:true}; // distinguish "genuinely doesn't exist" from "couldn't read it"
+  }
+}
+
+// Runs async fn() over items with at most `limit` in flight at once — fast (not one-at-a-time
+// like sequential writes need to be), but capped so we don't burst every request simultaneously
+// the way a plain Promise.all over dozens of items would.
+async function mapWithConcurrency(items, limit, fn){
+  const results = new Array(items.length);
+  let idx = 0;
+  async function worker(){
+    while(idx < items.length){
+      const i = idx++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({length: Math.min(limit, items.length)}, worker));
+  return results;
+}
+
+async function loadAllData(){
+  const rulesObj = await getJson('milepost:rules');
+  const rules = {}, teamMap = {};
+  if(rulesObj && !rulesObj.__readFailed){
+    STAGES.forEach(s=>{
+      const r = rulesObj[s.id];
+      if(r){ rules[s.id] = {base:r.base, mult:r.mult||{Dx:1,Tx:1.15,Both:1.3}, lmsMult:r.lmsMult||defaultLmsMult()}; teamMap[s.id] = r.team; }
+    });
+  }
+  const projectKeys = await listKeys('milepost:project:');
+  const loaded = await mapWithConcurrency(projectKeys, 6, async k=>getJson(k));
+  const projects = [];
+  const failedProjectKeys = [];
+  loaded.forEach((obj, i)=>{
+    if(!obj) return;
+    if(obj.__readFailed){ failedProjectKeys.push(projectKeys[i]); return; } // don't silently treat this as "doesn't exist"
+    obj._loadedAt = obj.updatedAt || null;
+    if(!obj.projectType) obj.projectType = 'Dx';
+    if(!obj.parallel) obj.parallel = {};
+    if(obj.manualStatus === undefined) obj.manualStatus = '';
+    if(!obj.progressStatus) obj.progressStatus = 'In Progress';
+    if(obj.completedOnTrack === undefined) obj.completedOnTrack = null;
+    if(obj.completedAt === undefined) obj.completedAt = null;
+    if(!obj.blockerTeam) obj.blockerTeam = '';
+    if(!obj.offTrackReason) obj.offTrackReason = '';
+    projects.push(obj);
+  });
+  const historyRaw = await getJson('milepost:history');
+  const history = (historyRaw && !historyRaw.__readFailed) ? historyRaw : [];
+  return { rules, teamMap, projects, history, hasRules: !!(rulesObj && !rulesObj.__readFailed), hasProjects: projectKeys.length>0, failedProjectKeys };
+}
+
+// Save one project. Returns {saved:true} normally, or {saved:false, conflict:true} if
+// someone else's newer version was found and the user chose not to overwrite it.
+async function saveProject(project, skipConflictCheck, silent){
+  if(!skipConflictCheck && project._loadedAt){
+    const remote = await getJson('milepost:project:'+project.id);
+    if(remote && remote.updatedAt && remote.updatedAt !== project._loadedAt){
+      const overwrite = await confirmDialog(
+        `"${project.name}" was changed by someone else at ${new Date(remote.updatedAt).toLocaleTimeString()}, after you last loaded it.\n\nOverwrite their change with yours, or discard yours and load theirs instead?`,
+        {okLabel:'Overwrite mine', cancelLabel:'Discard mine', danger:true}
+      );
+      if(!overwrite){
+        Object.assign(project, remote);
+        project._loadedAt = remote.updatedAt;
+        return {saved:false, conflict:true};
+      }
+    }
+  }
+  project.updatedAt = new Date().toISOString();
+  try{
+    await withRetry(()=>window.storage.set('milepost:project:'+project.id, JSON.stringify(project), SHARED), 4, 500);
+    project._loadedAt = project.updatedAt;
+    if(!silent) showToast(`Saved "${project.name}"`, 'success');
+    return {saved:true};
+  }catch(e){
+    console.log('Save failed (handled — user notified, retry available):', e && e.message);
+    if(!silent) showToast(`Couldn't save "${project.name}" — storage returned an error. Your change is still on screen; try again.`, 'error', 4500);
+    return {saved:false, error:e};
+  }
+}
+async function deleteProjectRemote(id){
+  try{
+    await withRetry(()=>window.storage.delete('milepost:project:'+id, SHARED), 4, 500);
+    return true;
+  }catch(e){
+    // Deleting a key that's already gone appears to error rather than no-op. If the record is
+    // demonstrably no longer there, that's the outcome we wanted anyway — treat it as success
+    // rather than surfacing a scary error for something that's already achieved.
+    const stillThere = await getJson('milepost:project:'+id);
+    if(!stillThere) return true;
+    console.log('Delete failed after retries (handled — user notified, retry available):', e && e.message);
+    return false;
+  }
+}
+
+// Rules are combined into a single key and saved together (Settings only ever saves all of them at once anyway).
+async function saveAllRules(){
+  const payload = {};
+  STAGES.forEach(s=>{
+    payload[s.id] = { base:STATE.config.stageRules[s.id].base, mult:STATE.config.stageRules[s.id].mult, lmsMult:STATE.config.stageRules[s.id].lmsMult, team:STATE.config.teamMap[s.id] };
+  });
+  try{ await withRetry(()=>window.storage.set('milepost:rules', JSON.stringify(payload), SHARED)); return true; }
+  catch(e){ console.log('Save failed (handled — user notified, retry available):', e && e.message); showToast('Could not save Settings — the storage service returned an error. Please try again.', 'error', 4500); return false; }
+}
+
+// History is one combined key; each append re-reads the latest remote list first so a
+// concurrent append from someone else isn't clobbered by an overwrite of a stale copy.
+async function addHistoryEntry(entry){
+  entry.id = uid('h');
+  try{
+    const remote = (await getJson('milepost:history')) || STATE.blockerHistory || [];
+    const merged = [...remote, entry];
+    await withRetry(()=>window.storage.set('milepost:history', JSON.stringify(merged), SHARED));
+    STATE.blockerHistory = merged;
+  }catch(e){
+    console.log('Save failed (handled — user notified, retry available):', e && e.message);
+    STATE.blockerHistory.push(entry); // keep it locally even if the write failed, so it's not silently lost on screen
+  }
+}
+
+// Save many projects one at a time (not in parallel) so a burst of writes doesn't trip
+// storage rate limits. Returns the list of projects that ultimately failed to save.
+async function saveProjectsSequentially(projects, skipConflictCheck){
+  const failed = [];
+  for(const p of projects){
+    const result = await saveProject(p, skipConflictCheck, true);
+    if(!result.saved && !result.conflict) failed.push(p);
+    await sleep(120);
+  }
+  return failed;
+}
+
+async function refreshAll(){
+  const data = await loadAllData();
+  if(data.hasRules){
+    STAGES.forEach(s=>{ if(data.rules[s.id]) STATE.config.stageRules[s.id]=data.rules[s.id]; if(data.teamMap[s.id]) STATE.config.teamMap[s.id]=data.teamMap[s.id]; });
+  }
+  if(data.failedProjectKeys && data.failedProjectKeys.length){
+    // A project that failed to re-read THIS cycle should not vanish from the screen — keep
+    // whatever we already had loaded for it and let the user know to try refreshing again.
+    const failedIds = data.failedProjectKeys.map(k=>k.replace('milepost:project:',''));
+    const preserved = STATE.projects.filter(p=>failedIds.includes(p.id));
+    STATE.projects = [...data.projects, ...preserved];
+    showToast(`${preserved.length} project(s) couldn't be refreshed this time (storage read error) — showing your last-loaded copy. Try refresh again.`, 'error', 5000);
+  } else {
+    STATE.projects = data.projects;
+  }
+  STATE.blockerHistory = data.history;
+  lastRefreshedAt = new Date();
+  updateRefreshLabel();
+  if(activeTab==='tracker') renderTracker();
+  if(activeTab==='summary') renderSummary();
+  if(activeTab==='teamload') renderTeamLoad();
+  if(activeTab==='archive') renderArchive();
+  if(activeTab==='settings') renderSettings();
+}
+function isBusy(){
+  if(document.getElementById('modalBackdrop').classList.contains('show')) return true;
+  const ae = document.activeElement;
+  return ae && ['INPUT','SELECT','TEXTAREA'].includes(ae.tagName);
+}
+function updateRefreshLabel(){
+  const el = document.getElementById('refreshLabel');
+  if(el && lastRefreshedAt) el.textContent = 'Synced ' + lastRefreshedAt.toLocaleTimeString();
+}
+setInterval(()=>{ if(!isBusy() && activeTab!=='settings') refreshAll(); }, 20000);
+
+/* ============================== SEED DATA ============================== */
+function seed(){
+  // `statusOffsetDays` = how many days the CURRENT stage's planned end sits from today.
+  // Positive = still time left (on-track). Negative = already overdue by that many days (off-track).
+  // The EDD is back-solved from that so the seed data stays consistent no matter how the
+  // Dx/Tx/LMs duration rules in Settings are tuned.
+  const seedHistory = [];
+  const mk = (name, em, wf, type, lms, statusOffsetDays, currentStageIdx, overrides={}) => {
+    const probe = {lms, projectType: type};
+    let daysAfterCurrent = 0;
+    for(let i=currentStageIdx+1;i<STAGES.length;i++) daysAfterCurrent += getStageDuration(STAGES[i].id, probe);
+    const edd = addBusinessDays(TODAY, statusOffsetDays + daysAfterCurrent);
+    const p = {
+      id: uid('p'), name, em, workflow: wf, projectType: type, lms,
+      edd, currentStageId: STAGES[currentStageIdx].id,
+      stageDates: {}, parallel: {}, manualStatus: overrides.manualStatus || '',
+      progressStatus: overrides.progressStatus || 'In Progress',
+      completedOnTrack: overrides.completedOnTrack ?? null,
+      completedAt: overrides.completedAt || null,
+      offTrackReason: overrides.reason||'', blockerTeam: overrides.blockerTeam||'', blockerTeamOther:'',
+    };
+    computeStageDates(p);
+    if(overrides.reason){ seedHistory.push({id:uid('h'), projectId:p.id, team:overrides.blockerTeam, date: TODAY}); }
+    return p;
+  };
+  STATE.projects = [
+    mk('Prairie Ridge Corridor', 'Aditi Sharma', 'New', 'Dx', 142, 5, 5, {manualStatus:'On-track'}),
+    mk('Sunbelt Transmission Ph.2', 'Marcus Webb', 'Old', 'Tx', 88, -4, 6, {reason:'Waiting on cleaned TG output from vendor', blockerTeam:'AIDataOps', manualStatus:'Off-track'}),
+    mk('Cascade Foothills Line', 'Aditi Sharma', 'New', 'Both', 210, 10, 2, {manualStatus:'On-track'}),
+    mk('Bluewater Rail Spur', 'Priya Natarajan', 'Old', 'Dx', 61, -2, 9, {reason:'IVMS credentials pending from client', blockerTeam:'FS', manualStatus:'On-track'}),
+    mk('Redstone Grid Upgrade', 'Marcus Webb', 'New', 'Tx', 175, 6, 4, {manualStatus:'Off-track'}),
+    mk('Northgate Feeder Network', 'Priya Natarajan', 'New', 'Dx', 96, -5, 10, {progressStatus:'Completed', completedOnTrack:false, completedAt:addDays(TODAY,-1)}),
+    mk('Tallgrass Interconnect', 'Deepak Rao', 'Old', 'Tx', 130, 8, 0, {manualStatus:'On-track', progressStatus:'Completed', completedOnTrack:true, completedAt:addDays(TODAY,-3)}),
+    mk('Copperline Substation Ext', 'Deepak Rao', 'New', 'Both', 54, -3, 7, {reason:'Sampling backlog, SE handoff delayed', blockerTeam:'SE', manualStatus:'Off-track'}),
+  ];
+  // Give one project a parallel-stage example (Imagery download + ingestion run together)
+  STATE.projects[4].parallel['imagery_dsm_ingestion'] = true;
+  computeStageDates(STATE.projects[4]);
+  return seedHistory;
+}
+
+/* ============================== CORE CALCS ============================== */
+// Effective duration for a stage on a given project: base days, scaled up for LMs beyond a
+// threshold, then scaled again by a Dx/Tx/Both multiplier. All three knobs live in Settings.
+function getStageDuration(stageId, project){
+  const rule = STATE.config.stageRules[stageId];
+  if(!rule) return 1;
+  const lms = project.lms||0;
+  const type = project.projectType || 'Dx';
+  const typeMult = (rule.mult && rule.mult[type]) || 1;
+  const band = getLmsBand(lms);
+  const lmsMult = (rule.lmsMult && rule.lmsMult[band]) || 1;
+  return Math.max(1, Math.round(rule.base * typeMult * lmsMult));
+}
+
+// Total standard span (in days) across all 11 stages for this project's Type/LMs, ignoring any
+// parallel flags or manual overrides. Purely a planning sanity-check number: "if I set the EDD
+// less than this many days out, the back-calculated schedule will already be in the past."
+function getStandardCycleLength(project){
+  return STAGES.reduce((sum,s)=>sum+getStageDuration(s.id, project), 0);
+}
+
+// Back-calculate stage start/end dates from EDD (last stage end = EDD), walking backwards.
+// If project.parallel[stageId] is true, that stage runs alongside the following stage (same start/end window).
+function computeStageDates(project){
+  let cursorEnd = project.edd;
+  const dates = {};
+  for(let i = STAGES.length-1; i>=0; i--){
+    const s = STAGES[i];
+    const approved = (project.stageDates[s.id] && project.stageDates[s.id].approved) ? project.stageDates[s.id] : null;
+    if(project.parallel[s.id] && i < STAGES.length-1){
+      // mirror the following stage's window (runs in parallel with it)
+      const next = dates[STAGES[i+1].id];
+      dates[s.id] = approved || { start: next.start, end: next.end, approved:false };
+      continue;
+    }
+    const end = cursorEnd;
+    const start = addBusinessDays(end, -(getStageDuration(s.id, project)-1));
+    dates[s.id] = approved || { start, end, approved:false };
+    cursorEnd = addBusinessDays(dates[s.id].start, -1);
+  }
+  // preserve any pending (unapproved) edit overlays
+  Object.keys(project.stageDates).forEach(k=>{
+    if(project.stageDates[k] && project.stageDates[k].pending){
+      dates[k].pending = project.stageDates[k].pending;
+    }
+  });
+  project.stageDates = dates;
+}
+
+// On-track check: is the CURRENT stage still within its own planned end date?
+// Earlier stages are expected to already be in the past once a project has moved on —
+// that's normal progression, not evidence of delay — so only the active stage is checked.
+function computeOnTrack(project){
+  const curDates = project.stageDates[project.currentStageId];
+  if(!curDates) return true;
+  return TODAY <= curDates.end;
+}
+
+// Estimated Project EDD: cascades forward from wherever the project actually stands today.
+// The current stage's effective finish is pushed out to "today" if it's already running late;
+// every stage after it is then stacked forward from that point using its own duration (which
+// itself flexes with LMs and Dx/Tx/Both). If nothing is late, this collapses back to the
+// original Project EDD. Stages already completed are not re-litigated — this is a forward
+// projection from the present, not a re-write of history.
+function computeEstimatedEdd(project){
+  const curIdx = stageIndex(project.currentStageId);
+  const curDates = project.stageDates[project.currentStageId];
+  if(!curDates) return project.edd;
+  let cursorEnd = curDates.end < TODAY ? TODAY : curDates.end;
+  for(let i=curIdx+1; i<STAGES.length; i++){
+    const s = STAGES[i];
+    if(project.parallel[s.id]){
+      continue; // runs alongside a neighboring stage — doesn't add sequential time
+    }
+    const d = getStageDuration(s.id, project);
+    cursorEnd = addBusinessDays(cursorEnd, d);
+  }
+  return cursorEnd;
+}
+
+async function bulkDeleteSelected(){
+  const ids = [...selectedProjectIds];
+  if(ids.length===0) return;
+  const names = STATE.projects.filter(p=>ids.includes(p.id)).map(p=>p.name);
+  const proceed = await confirmDialog(`Delete ${ids.length} project(s)?\n\n${names.slice(0,8).join('\n')}${names.length>8?`\n...and ${names.length-8} more`:''}\n\nThis can't be undone.`, {okLabel:'Delete', danger:true});
+  if(!proceed) return;
+  let deleted = 0, failed = 0;
+  for(const id of ids){
+    const ok = await deleteProjectRemote(id);
+    if(ok){
+      STATE.projects = STATE.projects.filter(p=>p.id!==id);
+      selectedProjectIds.delete(id);
+      deleted++;
+    } else {
+      failed++; // leave it selected and in the list so it's obvious it needs a retry
+    }
+    await sleep(200);
+  }
+  showToast(`Deleted ${deleted} project(s)${failed?`, ${failed} failed — still selected, try again`:''}`, failed?'error':'success', failed?4500:2600);
+  renderTracker();
+}
+
+// Completed projects live in the Archive, not the Tracker — this is the single source of
+// truth for that split, used by the Tracker, Summary, and Team Load so they all agree on
+// what counts as "current work".
+function activeProjects(){ return STATE.projects.filter(p=>p.progressStatus!=='Completed'); }
+
+function filteredProjects(){
+  return activeProjects().filter(p=>{
+    if(filters.em.length && !filters.em.includes(p.em)) return false;
+    if(filters.workflow.length && !filters.workflow.includes(p.workflow)) return false;
+    if(filters.stage.length && !filters.stage.includes(p.currentStageId)) return false;
+    if(filters.track.length){
+      const on = computeOnTrack(p) ? 'on' : 'off';
+      if(!filters.track.includes(on)) return false;
+    }
+    if(filters.blocker.length){
+      const b = p.blockerTeam || '__none__';
+      if(!filters.blocker.includes(b)) return false;
+    }
+    if(filters.type.length && !filters.type.includes(p.projectType)) return false;
+    if(filters.manual.length){
+      const m = p.manualStatus || '__unset__';
+      if(!filters.manual.includes(m)) return false;
+    }
+    if(filters.q && !p.name.toLowerCase().includes(filters.q.toLowerCase()) && !p.em.toLowerCase().includes(filters.q.toLowerCase())) return false;
+    return true;
+  });
+}
+
+const SORT_ACCESSORS = {
+  name: p => p.name.toLowerCase(),
+  em: p => p.em.toLowerCase(),
+  workflow: p => p.workflow.toLowerCase(),
+  type: p => p.projectType,
+  lms: p => p.lms,
+  edd: p => p.edd,
+  estEdd: p => computeEstimatedEdd(p),
+  stage: p => stageIndex(p.currentStageId),
+  systemStatus: p => computeOnTrack(p) ? 1 : 0, // off-track first when ascending
+  manualStatus: p => p.manualStatus ? (p.manualStatus==='Off-track' ? 0 : 2) : 1, // off-track, not-set, on-track
+  progress: p => ({in_progress:0, completed_off:1, completed_on:2}[getProgressBucket(p)]),
+  blocker: p => (p.blockerTeam||'').toLowerCase(),
+};
+function sortProjects(list){
+  if(!sortState.key) return list;
+  const accessor = SORT_ACCESSORS[sortState.key];
+  if(!accessor) return list;
+  const dir = sortState.dir==='asc' ? 1 : -1;
+  return [...list].sort((a,b)=>{
+    const av = accessor(a), bv = accessor(b);
+    if(av<bv) return -1*dir;
+    if(av>bv) return 1*dir;
+    return a.name.localeCompare(b.name); // stable-ish tiebreaker
+  });
+}
+function setSort(key){
+  if(sortState.key===key){ sortState.dir = sortState.dir==='asc' ? 'desc' : 'asc'; }
+  else{ sortState = { key, dir: 'asc' }; }
+  renderTracker();
+}
+function sortArrow(key){
+  if(sortState.key!==key) return `<span class="sort-arrow idle">⇅</span>`;
+  return `<span class="sort-arrow active">${sortState.dir==='asc'?'▲':'▼'}</span>`;
+}
+
+/* ============================== RENDER: TRACKER ============================== */
+function renderTracker(){
+  const el = document.getElementById('tab-tracker');
+  const ems = [...new Set(STATE.projects.map(p=>p.em))].sort();
+  const blockerTeamsUsed = [...new Set([...TEAMS, ...STATE.projects.map(p=>p.blockerTeam).filter(Boolean)])];
+  const list = sortProjects(filteredProjects());
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="section-title">Project Tracker <span class="tag">${list.length} of ${activeProjects().length} active</span>
+        <span style="flex:1"></span>
+        ${selectedProjectIds.size>0 ? `<button class="btn danger ghost small" id="btnBulkDelete">Delete selected (${selectedProjectIds.size})</button>` : ''}
+        <button class="btn ghost small" id="btnCsvTemplate">Download CSV template</button>
+        <button class="btn ghost small" id="btnCsvExport">Export CSV</button>
+        <button class="btn small" id="btnCsvImport">Import CSV</button>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+        <button class="btn primary small" id="btnAddProject">+ New Project</button>
+      </div>
+      <div class="filterbar">
+        <div class="field"><label>Search</label><input type="text" id="fQ" placeholder="Project or EM/PM..." value="${escapeHtml(filters.q)}"></div>
+        ${renderMultiselect(filters, 'em', 'EM/PM', ems.map(e=>({value:e, label:e})))}
+        ${renderMultiselect(filters, 'workflow', 'Workflow', WORKFLOWS.map(w=>({value:w, label:w})))}
+        ${renderMultiselect(filters, 'type', 'Type', PROJECT_TYPES.map(t=>({value:t, label:t})))}
+        ${renderMultiselect(filters, 'stage', 'Stage', STAGES.map(s=>({value:s.id, label:s.name})))}
+        ${renderMultiselect(filters, 'track', 'System Status', [{value:'on',label:'On-track'},{value:'off',label:'Off-track'}])}
+        ${renderMultiselect(filters, 'manual', 'EM Status', [{value:'On-track',label:'On-track'},{value:'Off-track',label:'Off-track'},{value:'__unset__',label:'Not set'}])}
+        ${renderMultiselect(filters, 'blocker', 'Blocker Team', [{value:'__none__',label:'No blocker'}, ...blockerTeamsUsed.map(t=>({value:t, label:t}))])}
+        <div class="field"><button class="btn ghost small" id="btnClearFilters">Clear filters</button></div>
+      </div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th style="width:40px">S No</th>
+          <th style="width:32px"><input type="checkbox" id="selectAllCb" ${list.length>0 && list.every(p=>selectedProjectIds.has(p.id))?'checked':''}></th>
+          <th class="sortable" data-sort="name">Project ${sortArrow('name')}</th>
+          <th class="sortable" data-sort="workflow">Workflow ${sortArrow('workflow')}</th>
+          <th class="sortable" data-sort="type">Type ${sortArrow('type')}</th>
+          <th class="sortable" data-sort="lms">LMs ${sortArrow('lms')}</th>
+          <th class="sortable" data-sort="edd">EDD ${sortArrow('edd')}</th>
+          <th class="sortable" data-sort="estEdd">Est. EDD ${sortArrow('estEdd')}</th>
+          <th class="sortable" data-sort="stage">Current Stage ${sortArrow('stage')}</th>
+          <th style="min-width:220px">Stage Rail</th>
+          <th class="sortable" data-sort="systemStatus">System Status ${sortArrow('systemStatus')}</th>
+          <th class="sortable" data-sort="manualStatus">EM Status ${sortArrow('manualStatus')}</th>
+          <th>Progress</th>
+          <th class="sortable" data-sort="blocker">Blocker ${sortArrow('blocker')}</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${list.length===0 ? `<tr class="empty-row"><td colspan="15">No projects match these filters.</td></tr>` : list.map((p,i)=>renderProjectRow(p,i+1)).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('btnAddProject').onclick = ()=>openProjectModal(null);
+  document.querySelectorAll('th.sortable').forEach(th=>{
+    th.onclick = ()=>setSort(th.dataset.sort);
+  });
+  document.getElementById('btnCsvTemplate').onclick = downloadCsvTemplate;
+  document.getElementById('btnCsvExport').onclick = exportCsv;
+  document.getElementById('btnCsvImport').onclick = ()=>document.getElementById('csvFileInput').click();
+  document.getElementById('csvFileInput').onchange = handleCsvFileSelect;
+  document.getElementById('fQ').oninput = e=>{
+    filters.q = e.target.value;
+    const caret = e.target.selectionStart;
+    renderTracker();
+    const revived = document.getElementById('fQ');
+    revived.focus();
+    revived.setSelectionRange(caret, caret);
+  };
+  wireMultiselects(el, filters, renderTracker);
+  document.getElementById('btnClearFilters').onclick = ()=>{
+    filters = {em:[],workflow:[],stage:[],track:[],blocker:[],type:[],manual:[],q:''};
+    openMultiselect = null;
+    renderTracker();
+  };
+  document.getElementById('selectAllCb').onchange = e=>{
+    if(e.target.checked){ list.forEach(p=>selectedProjectIds.add(p.id)); }
+    else { list.forEach(p=>selectedProjectIds.delete(p.id)); }
+    renderTracker();
+  };
+  document.querySelectorAll('.rowSelectCb').forEach(cb=>{
+    cb.onchange = ()=>{
+      if(cb.checked) selectedProjectIds.add(cb.dataset.id);
+      else selectedProjectIds.delete(cb.dataset.id);
+      renderTracker();
+    };
+  });
+  const bulkBtn = document.getElementById('btnBulkDelete');
+  if(bulkBtn) bulkBtn.onclick = ()=>bulkDeleteSelected();
+
+  list.forEach(p=>{
+    document.getElementById('editStage_'+p.id).onclick = ()=>openStageEditModal(p.id);
+    document.getElementById('editMeta_'+p.id).onclick = ()=>openProjectModal(p.id);
+    document.getElementById('stageSel_'+p.id).onchange = async e=>{
+      p.currentStageId = e.target.value;
+      await saveProject(p);
+      renderTracker();
+    };
+    document.getElementById('manualSel_'+p.id).onchange = async e=>{
+      p.manualStatus = e.target.value;
+      await saveProject(p);
+      renderTracker();
+    };
+    document.getElementById('progressSel_'+p.id).onchange = async e=>{
+      const newStatus = e.target.value;
+      if(newStatus==='Completed' && p.progressStatus!=='Completed'){
+        // Freeze whether it was on-track right at the moment it's marked complete.
+        p.completedOnTrack = computeOnTrack(p);
+        p.completedAt = TODAY;
+      } else if(newStatus==='In Progress'){
+        p.completedOnTrack = null;
+        p.completedAt = null;
+      }
+      p.progressStatus = newStatus;
+      await saveProject(p);
+      renderTracker();
+    };
+    const br = document.getElementById('blockBtn_'+p.id);
+    if(br) br.onclick = ()=>openBlockerModal(p.id);
+  });
+}
+
+function renderProjectRow(p, sNo){
+  const onTrack = computeOnTrack(p);
+  const estEdd = computeEstimatedEdd(p);
+  const slipDays = daysBetween(p.edd, estEdd);
+  return `
+    <tr>
+      <td class="mono" style="color:var(--muted-2)">${sNo}</td>
+      <td><input type="checkbox" class="rowSelectCb" data-id="${p.id}" ${selectedProjectIds.has(p.id)?'checked':''}></td>
+      <td>
+        <div class="pname">${escapeHtml(p.name)}</div>
+        <div class="psub">${escapeHtml(p.em)}</div>
+      </td>
+      <td><span class="wf-pill">${p.workflow}</span></td>
+      <td><span class="type-pill type-${p.projectType}">${p.projectType}</span></td>
+      <td class="mono">${p.lms}</td>
+      <td class="mono">${fmtDate(p.edd)}</td>
+      <td class="mono">
+        ${fmtDate(estEdd)}
+        ${slipDays>0 ? `<div class="slip-tag">+${slipDays}d</div>` : (slipDays<0?`<div class="slip-tag early">${slipDays}d</div>`:'')}
+      </td>
+      <td>
+        <select id="stageSel_${p.id}" style="font-size:12px;padding:6px 8px;">
+          ${STAGES.map(s=>`<option value="${s.id}" ${p.currentStageId===s.id?'selected':''}>${s.name}</option>`).join('')}
+        </select>
+      </td>
+      <td>${renderRail(p)}</td>
+      <td>
+        <span class="pill ${onTrack?'on':'off'}"><span class="dot"></span>${onTrack?'On-track':'Off-track'}</span>
+      </td>
+      <td>
+        <select id="manualSel_${p.id}" class="manual-status-sel manual-${p.manualStatus==='On-track'?'on':(p.manualStatus==='Off-track'?'off':'unset')}">
+          <option value="" ${!p.manualStatus?'selected':''}>Not set</option>
+          ${MANUAL_STATUS_OPTIONS.map(o=>`<option value="${o}" ${p.manualStatus===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select id="progressSel_${p.id}" class="progress-sel ${p.progressStatus==='Completed'?'progress-done':'progress-active'}">
+          ${PROGRESS_STATUSES.map(o=>`<option value="${o}" ${p.progressStatus===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+        ${p.progressStatus==='Completed' ? `<div class="completed-tag ${p.completedOnTrack?'on':'off'}">${p.completedOnTrack?'✓ Completed on-track':'✕ Completed off-track'}${p.completedAt?` · ${fmtDate(p.completedAt)}`:''}</div>` : ''}
+      </td>
+      <td>
+        ${p.blockerTeam ? `<div class="blocker-tag"><b>${escapeHtml(p.blockerTeam)}</b><br>${escapeHtml(p.offTrackReason||'')}</div>` : `<button class="btn ghost small" id="blockBtn_${p.id}">+ Add reason</button>`}
+      </td>
+      <td>
+        <div class="actions-cell">
+          <button class="icon-btn" id="editStage_${p.id}" title="Edit stage dates">📅</button>
+          <button class="icon-btn" id="editMeta_${p.id}" title="Edit project">✎</button>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function renderRail(p){
+  const curIdx = stageIndex(p.currentStageId);
+  const onTrack = computeOnTrack(p);
+  return `<div class="rail">${STAGES.map((s,i)=>{
+    const d = p.stageDates[s.id];
+    let cls = 'tie';
+    if(i < curIdx) cls += ' done';
+    else if(i === curIdx) cls += ' current ' + (onTrack?'on':'off');
+    const pendingNote = d && d.pending ? ' · pending approval' : '';
+    return `<div class="${cls}">
+      <div class="tip"><div class="tname">${s.abbr} — ${s.name}${p.parallel[s.id]?' (parallel)':''}</div><div class="trange">${d?fmtDate(d.start):'—'} → ${d?fmtDate(d.end):'—'}${pendingNote}</div></div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+/* ---------- Blocker reason modal ---------- */
+function openBlockerModal(projectId){
+  const p = STATE.projects.find(x=>x.id===projectId);
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <button class="modal-close" id="mClose">✕</button>
+    <h2>Off-track reason</h2>
+    <p class="modal-sub">${escapeHtml(p.name)}</p>
+    <div class="field">
+      <label>Blocking team</label>
+      <select id="mTeam">
+        <option value="">Select team...</option>
+        ${TEAMS.map(t=>`<option ${p.blockerTeam===t?'selected':''}>${t}</option>`).join('')}
+        <option value="__other__" ${p.blockerTeam && !TEAMS.includes(p.blockerTeam)?'selected':''}>Other (specify)</option>
+      </select>
+    </div>
+    <div class="field" id="otherWrap" style="display:none">
+      <label>Team name</label>
+      <input type="text" id="mTeamOther" value="${!TEAMS.includes(p.blockerTeam)?escapeHtml(p.blockerTeam||''):''}">
+    </div>
+    <div class="field">
+      <label>Reason</label>
+      <textarea id="mReason" rows="3">${escapeHtml(p.offTrackReason||'')}</textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn primary" id="mSave">Save</button>
+    </div>
+  `;
+  document.getElementById('mTeam').onchange = e=>{
+    document.getElementById('otherWrap').style.display = e.target.value==='__other__' ? 'block':'none';
+  };
+  if(p.blockerTeam && !TEAMS.includes(p.blockerTeam)) document.getElementById('otherWrap').style.display='block';
+  document.getElementById('mClose').onclick = closeModal;
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSave').onclick = async ()=>{
+    let team = document.getElementById('mTeam').value;
+    if(team==='__other__') team = document.getElementById('mTeamOther').value.trim();
+    p.blockerTeam = team;
+    p.offTrackReason = document.getElementById('mReason').value.trim();
+    if(team) await addHistoryEntry({projectId:p.id, team, date: TODAY});
+    await saveProject(p);
+    closeModal(); renderTracker();
+  };
+  showModal();
+}
+
+/* ---------- Project add/edit modal ---------- */
+function openProjectModal(projectId){
+  const editing = !!projectId;
+  const p = editing ? STATE.projects.find(x=>x.id===projectId) : null;
+  const ems = [...new Set(STATE.projects.map(x=>x.em))].sort();
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <button class="modal-close" id="mClose">✕</button>
+    <h2>${editing?'Edit project':'New project'}</h2>
+    <p class="modal-sub">${editing?'Update project-level details.':'Add a project to the tracker.'}</p>
+    <div class="field"><label>Project name</label><input type="text" id="mName" value="${editing?escapeHtml(p.name):''}"></div>
+    <div class="field-row">
+      <div class="field"><label>EM / PM name</label><input type="text" id="mEm" list="emList" value="${editing?escapeHtml(p.em):''}"><datalist id="emList">${ems.map(e=>`<option value="${escapeHtml(e)}">`).join('')}</datalist></div>
+      <div class="field"><label>Workflow</label><select id="mWf">${WORKFLOWS.map(w=>`<option ${editing&&p.workflow===w?'selected':''}>${w}</option>`).join('')}</select></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Type</label><select id="mType">${PROJECT_TYPES.map(t=>`<option ${editing&&p.projectType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>LMs</label><input type="number" id="mLms" value="${editing?p.lms:''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Project EDD</label><input type="date" id="mEdd" value="${editing?p.edd:TODAY}"></div>
+      <div class="field">${editing?`<label>Estimated EDD <span style="text-transform:none;font-weight:400">(computed)</span></label><input type="text" disabled value="${fmtDate(computeEstimatedEdd(p))}" style="opacity:.7">`:''}</div>
+    </div>
+    <p class="modal-sub" id="spanHint" style="margin-top:-6px"></p>
+    <div class="field"><label>Current stage</label><select id="mStage">${STAGES.map(s=>`<option value="${s.id}" ${editing&&p.currentStageId===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
+    <div class="field"><label>EM Status <span style="text-transform:none;font-weight:400">(self-reported by EM/PM)</span></label>
+      <select id="mManualStatus">
+        <option value="" ${editing&&!p.manualStatus?'selected':''}>Not set</option>
+        ${MANUAL_STATUS_OPTIONS.map(o=>`<option value="${o}" ${editing&&p.manualStatus===o?'selected':''}>${o}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>Progress</label>
+      <select id="mProgress">
+        ${PROGRESS_STATUSES.map(o=>`<option value="${o}" ${editing&&p.progressStatus===o?'selected':(!editing&&o==='In Progress'?'selected':'')}>${o}</option>`).join('')}
+      </select>
+      ${editing && p.progressStatus==='Completed' ? `<p class="modal-sub" style="margin-top:6px">Marked complete ${p.completedAt?fmtDate(p.completedAt):''} — ${p.completedOnTrack?'on-track':'off-track'} at that time. Switching back to "In Progress" clears this record.</p>` : ''}
+    </div>
+    ${editing ? `<p class="modal-sub" style="margin-top:14px">Changing the EDD recalculates every stage's start/end window from scratch.</p>`:''}
+    <div class="modal-foot">
+      ${editing?`<button class="btn danger ghost" id="mDelete" style="margin-right:auto">Delete project</button>`:''}
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn primary" id="mSave">${editing?'Save changes':'Add project'}</button>
+    </div>
+  `;
+  document.getElementById('mClose').onclick = closeModal;
+  document.getElementById('mCancel').onclick = closeModal;
+  if(editing) document.getElementById('mDelete').onclick = async ()=>{
+    const ok = await deleteProjectRemote(projectId);
+    if(!ok){
+      showToast(`Couldn't delete "${p.name}" — storage returned an error. Nothing was removed; try again.`, 'error', 4500);
+      return; // keep the project and the modal exactly as they were
+    }
+    STATE.projects = STATE.projects.filter(x=>x.id!==projectId);
+    showToast(`Deleted "${p.name}"`, 'success');
+    closeModal(); renderTracker();
+  };
+  const updateSpanHint = ()=>{
+    const lms = parseFloat(document.getElementById('mLms').value)||0;
+    const type = document.getElementById('mType').value;
+    const eddVal = document.getElementById('mEdd').value || TODAY;
+    const span = getStandardCycleLength({lms, projectType:type});
+    const daysOut = businessDaysBetween(TODAY, eddVal);
+    const hint = document.getElementById('spanHint');
+    hint.textContent = `At current Settings rules, a ${type} project with ${lms} LMs spans ~${span} business day(s) end-to-end. This EDD is ~${daysOut} business day(s) out.`;
+    hint.style.color = daysOut < span ? 'var(--red)' : 'var(--muted)';
+    if(daysOut < span) hint.textContent += ' That EDD is tighter than the standard span — whichever stage you mark as current, its planned window may already be in the past.';
+  };
+  ['mLms','mType','mEdd'].forEach(id=>document.getElementById(id).addEventListener('input', updateSpanHint));
+  updateSpanHint();
+  document.getElementById('mSave').onclick = async ()=>{
+    const name = document.getElementById('mName').value.trim();
+    if(!name){ showToast('Project name is required.', 'error'); return; }
+    const em = document.getElementById('mEm').value.trim();
+    const workflow = document.getElementById('mWf').value;
+    const projectType = document.getElementById('mType').value;
+    const lms = parseFloat(document.getElementById('mLms').value)||0;
+    const edd = document.getElementById('mEdd').value || TODAY;
+    const currentStageId = document.getElementById('mStage').value;
+    const manualStatus = document.getElementById('mManualStatus').value;
+    const newProgress = document.getElementById('mProgress').value;
+    let target;
+    if(editing){
+      const recalcNeeded = p.edd !== edd || p.lms !== lms || p.projectType !== projectType;
+      if(newProgress==='Completed' && p.progressStatus!=='Completed'){
+        p.completedOnTrack = computeOnTrack(p);
+        p.completedAt = TODAY;
+      } else if(newProgress==='In Progress' && p.progressStatus==='Completed'){
+        p.completedOnTrack = null;
+        p.completedAt = null;
+      }
+      Object.assign(p, {name, em, workflow, projectType, lms, edd, currentStageId, manualStatus, progressStatus:newProgress});
+      if(recalcNeeded){ p.stageDates = {}; computeStageDates(p); }
+      target = p;
+    } else {
+      const np = {id:uid('p'), name, em, workflow, projectType, lms, edd, currentStageId, stageDates:{}, parallel:{}, manualStatus, progressStatus:newProgress, completedOnTrack:null, completedAt:null, offTrackReason:'', blockerTeam:''};
+      computeStageDates(np);
+      if(newProgress==='Completed'){ np.completedOnTrack = computeOnTrack(np); np.completedAt = TODAY; }
+      STATE.projects.push(np);
+      target = np;
+    }
+    const result = await saveProject(target, !editing);
+    if(result.conflict){ renderTracker(); return; } // reloaded their version instead — don't close/celebrate a save that didn't happen
+    closeModal(); renderTracker();
+  };
+  showModal();
+}
+
+/* ---------- Stage date edit modal (requires approval) ---------- */
+function openStageEditModal(projectId){
+  const p = STATE.projects.find(x=>x.id===projectId);
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <button class="modal-close" id="mClose">✕</button>
+    <h2>Stage schedule</h2>
+    <p class="modal-sub">${escapeHtml(p.name)} · back-calculated from EDD ${fmtDate(p.edd)} using business days (weekends skipped). Edits here apply immediately.</p>
+    <div id="stageRows">
+      ${STAGES.map(s=>{
+        const d = p.stageDates[s.id];
+        return `<div class="stage-edit-row">
+          <div class="sname">${s.name}<span class="team">${STATE.config.teamMap[s.id]}</span></div>
+          <div><input type="date" class="sdStart" data-stage="${s.id}" value="${d.start}"></div>
+          <div><input type="date" class="sdEnd" data-stage="${s.id}" value="${d.end}"></div>
+          <label class="parallel-toggle"><input type="checkbox" class="sdPar" data-stage="${s.id}" ${p.parallel[s.id]?'checked':''} ${stageIndex(s.id)===0?'disabled':''}> parallel</label>
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="modal-sub" style="margin-top:10px">Check "parallel" to have a stage run alongside the stage before it instead of sequentially after it.</p>
+    <div class="modal-foot">
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn primary" id="mSubmit">Save changes</button>
+    </div>
+  `;
+  document.getElementById('mClose').onclick = closeModal;
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mSubmit').onclick = async ()=>{
+    STAGES.forEach(s=>{
+      const startInput = document.querySelector(`.sdStart[data-stage="${s.id}"]`).value;
+      const endInput = document.querySelector(`.sdEnd[data-stage="${s.id}"]`).value;
+      const parInput = document.querySelector(`.sdPar[data-stage="${s.id}"]`).checked;
+      const cur = p.stageDates[s.id];
+      p.parallel[s.id] = parInput;
+      if(startInput!==cur.start || endInput!==cur.end){
+        p.stageDates[s.id] = {start:startInput, end:endInput, approved:true};
+      }
+    });
+    computeStageDates(p);
+    const result = await saveProject(p);
+    closeModal();
+    renderTracker();
+  };
+  showModal();
+}
+
+/* ============================== CSV IMPORT / EXPORT ============================== */
+const CSV_BASE_COLUMNS = ['Project Name','EM/PM Name','Workflow (New/Old)','Type (Dx/Tx/Both)','LMs','Project EDD (YYYY-MM-DD)','Current Stage','EM Status (On-track/Off-track/blank)','Progress Status (In Progress/Completed)','Completed On-Track (Yes/No/blank)','Blocker Team (optional)','Off-Track Reason (optional)'];
+const CSV_STAGE_COLUMNS = STAGES.flatMap(s=>[`${s.name} Start`, `${s.name} End`]);
+const CSV_COLUMNS = [...CSV_BASE_COLUMNS, ...CSV_STAGE_COLUMNS];
+const CSV_BASE_COUNT = CSV_BASE_COLUMNS.length;
+
+function csvCell(val){
+  const s = String(val==null?'':val);
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function downloadCsvTemplate(){
+  const sampleBase = ['Prairie Ridge Corridor','Aditi Sharma','New','Dx',142,addDays(TODAY,25),'Sampling/Labelling','On-track','In Progress','','',''];
+  const sampleProbe = {lms:142, projectType:'Dx', edd:addDays(TODAY,25), stageDates:{}, parallel:{}};
+  computeStageDates(sampleProbe);
+  const sampleStageDates = STAGES.flatMap(s=>[sampleProbe.stageDates[s.id].start, sampleProbe.stageDates[s.id].end]);
+  const csv = [CSV_COLUMNS, [...sampleBase, ...sampleStageDates]].map(r=>r.map(csvCell).join(',')).join('\n');
+  triggerDownload('milepost-template.csv', csv);
+}
+
+function exportCsv(){
+  const rows = STATE.projects.map(p=>{
+    const base = [p.name, p.em, p.workflow, p.projectType, p.lms, p.edd, STAGE_BY_ID[p.currentStageId].name, p.manualStatus||'', p.progressStatus||'In Progress', p.progressStatus==='Completed'?(p.completedOnTrack?'Yes':'No'):'', p.blockerTeam||'', p.offTrackReason||''];
+    const stageDates = STAGES.flatMap(s=>{
+      const d = p.stageDates[s.id];
+      return [d?d.start:'', d?d.end:''];
+    });
+    return [...base, ...stageDates];
+  });
+  const csv = [CSV_COLUMNS, ...rows].map(r=>r.map(csvCell).join(',')).join('\n');
+  triggerDownload('milepost-projects.csv', csv);
+}
+
+function triggerDownload(filename, content){
+  const blob = new Blob([content], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// Minimal RFC4180-ish CSV parser (handles quoted fields, commas, newlines inside quotes)
+function parseCsv(text){
+  const rows = []; let row = []; let field = ''; let inQuotes = false;
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ field += '"'; i++; } else { inQuotes = false; }
+      } else field += c;
+    } else {
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ row.push(field); field=''; }
+      else if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else field += c;
+    }
+  }
+  if(field.length>0 || row.length>0){ row.push(field); rows.push(row); }
+  return rows.filter(r => !(r.length===1 && r[0].trim()===''));
+}
+
+function findStageByLabel(label){
+  if(!label) return null;
+  const norm = label.trim().toLowerCase();
+  return STAGES.find(s => s.id===norm || s.name.toLowerCase()===norm || s.abbr.toLowerCase()===norm) || null;
+}
+
+function normalizeDate(val){
+  if(!val) return null;
+  const s = val.trim();
+  // Accept YYYY-MM-DD directly
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Accept MM/DD/YYYY or M/D/YYYY
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  const d = new Date(s);
+  if(!isNaN(d)) return d.toISOString().slice(0,10);
+  return null;
+}
+
+function handleCsvFileSelect(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try{
+      const rows = parseCsv(evt.target.result);
+      if(rows.length===0){ showToast('That CSV looks empty.', 'error'); return; }
+      // Drop header row (match loosely: first cell contains "project" and "name")
+      let dataRows = rows;
+      if(/project/i.test(rows[0][0]||'') ) dataRows = rows.slice(1);
+      const parsed = dataRows.map((r,i)=>parseCsvRow(r,i));
+      openCsvPreviewModal(parsed);
+    }catch(err){
+      showToast('Could not read that file as CSV. Please check the format and try again.', 'error', 4000);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // allow re-selecting same file later
+}
+
+function parseCsvRow(r, i){
+  const [name, em, workflow, projectType, lms, edd, stageLabel, manualStatusRaw, progressRaw, completedOnTrackRaw, blockerTeam, reason] = [r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]].map(v=>(v||'').trim());
+  const errors = [];
+  if(!name) errors.push('Missing project name');
+  if(!em) errors.push('Missing EM/PM name');
+  const wf = WORKFLOWS.find(w=>w.toLowerCase()===workflow.toLowerCase()) || null;
+  if(workflow && !wf) errors.push(`Workflow "${workflow}" should be New or Old`);
+  const pt = PROJECT_TYPES.find(t=>t.toLowerCase()===projectType.toLowerCase()) || null;
+  if(projectType && !pt) errors.push(`Type "${projectType}" should be Dx, Tx, or Both`);
+  const lmsNum = lms==='' ? 0 : parseFloat(lms);
+  if(lms!=='' && isNaN(lmsNum)) errors.push(`LMs "${lms}" is not a number`);
+  const eddNorm = normalizeDate(edd);
+  if(edd && !eddNorm) errors.push(`EDD "${edd}" is not a recognizable date`);
+  const stage = findStageByLabel(stageLabel);
+  if(stageLabel && !stage) errors.push(`Stage "${stageLabel}" doesn't match a known stage`);
+  const manualStatus = MANUAL_STATUS_OPTIONS.find(o=>o.toLowerCase()===manualStatusRaw.toLowerCase()) || null;
+  if(manualStatusRaw && !manualStatus) errors.push(`EM Status "${manualStatusRaw}" should be On-track, Off-track, or blank`);
+  const progressStatus = PROGRESS_STATUSES.find(o=>o.toLowerCase()===progressRaw.toLowerCase()) || null;
+  if(progressRaw && !progressStatus) errors.push(`Progress Status "${progressRaw}" should be In Progress or Completed`);
+  let completedOnTrack = null;
+  if(completedOnTrackRaw){
+    if(/^y(es)?$/i.test(completedOnTrackRaw)) completedOnTrack = true;
+    else if(/^n(o)?$/i.test(completedOnTrackRaw)) completedOnTrack = false;
+    else errors.push(`Completed On-Track "${completedOnTrackRaw}" should be Yes, No, or blank`);
+  }
+  let team = blockerTeam;
+
+  const stageEdits = {};
+  STAGES.forEach((s, idx)=>{
+    const startRaw = (r[CSV_BASE_COUNT + idx*2] || '').trim();
+    const endRaw = (r[CSV_BASE_COUNT + idx*2 + 1] || '').trim();
+    if(!startRaw && !endRaw) return;
+    const startN = normalizeDate(startRaw);
+    const endN = normalizeDate(endRaw);
+    if(startRaw && !startN) errors.push(`${s.name} start "${startRaw}" is not a recognizable date`);
+    else if(endRaw && !endN) errors.push(`${s.name} end "${endRaw}" is not a recognizable date`);
+    else if(startN && endN) stageEdits[s.id] = {start:startN, end:endN};
+  });
+
+  return {
+    row: i+1, raw: r, errors,
+    name, em, workflow: wf || 'New', projectType: pt || 'Dx', lms: isNaN(lmsNum)?0:lmsNum,
+    edd: eddNorm || addDays(TODAY,30), currentStageId: stage ? stage.id : STAGES[0].id,
+    manualStatus: manualStatus || '', progressStatus: progressStatus || 'In Progress', completedOnTrack,
+    blockerTeam: team, offTrackReason: reason, stageEdits
+  };
+}
+
+function openCsvPreviewModal(parsed){
+  const errCount = parsed.filter(p=>p.errors.length>0).length;
+  const okCount = parsed.length - errCount;
+  const existingNamesLower = new Set(STATE.projects.map(p=>p.name.toLowerCase()));
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <button class="modal-close" id="mClose">✕</button>
+    <h2>Import preview</h2>
+    <p class="modal-sub">${parsed.length} row(s) found — ${okCount} ready to import${errCount?`, ${errCount} with issues (fix in your CSV or they'll be skipped)`:''}. Any Start/End date columns you fill in are applied immediately.</p>
+    <div style="max-height:360px;overflow:auto;border:1px solid var(--hairline-soft);border-radius:8px">
+      <table>
+        <thead><tr><th>#</th><th>Project</th><th>EM/PM</th><th>Type</th><th>LMs</th><th>EDD</th><th>Stage</th><th>Action</th><th>Date edits</th><th>Issues</th></tr></thead>
+        <tbody>
+          ${parsed.map(p=>{
+            const willUpdate = existingNamesLower.has(p.name.toLowerCase());
+            const editCount = Object.keys(p.stageEdits).length;
+            return `
+            <tr style="${p.errors.length?'opacity:.55':''}">
+              <td class="mono">${p.row}</td>
+              <td>${escapeHtml(p.name)||'—'}</td>
+              <td>${escapeHtml(p.em)||'—'}</td>
+              <td>${p.projectType}</td>
+              <td class="mono">${p.lms}</td>
+              <td class="mono">${fmtDate(p.edd)}</td>
+              <td>${STAGE_BY_ID[p.currentStageId].name}</td>
+              <td>${willUpdate?`<span class="wf-pill" style="color:var(--teal);border-color:var(--teal)">Update</span>`:`<span class="wf-pill" style="color:var(--green);border-color:var(--green)">New</span>`}</td>
+              <td class="mono">${editCount>0?editCount+' stage(s)':'—'}</td>
+              <td style="color:var(--red);font-size:11.5px">${p.errors.join('; ')}</td>
+            </tr>
+          `;}).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="field" style="margin-top:16px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="mUpdateExisting" checked style="width:14px;height:14px">
+        <span style="text-transform:none;font-weight:400;color:var(--muted);font-size:12.5px">Update projects whose name already matches (including any Start/End dates you've filled in). Uncheck to only add brand-new projects and leave existing ones untouched.</span>
+      </label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="mCancel">Cancel</button>
+      <button class="btn primary" id="mImport" ${okCount===0?'disabled':''}>Import ${okCount} row${okCount===1?'':'s'}</button>
+    </div>
+  `;
+  document.getElementById('mClose').onclick = closeModal;
+  document.getElementById('mCancel').onclick = closeModal;
+  document.getElementById('mImport').onclick = async ()=>{
+    const updateExisting = document.getElementById('mUpdateExisting').checked;
+    let added = 0, updated = 0, skipped = 0, edits = 0;
+    const failedRows = []; // {row, name, project} — project already has the merged in-memory changes
+    for(const p of parsed.filter(x=>x.errors.length===0)){
+      let project = STATE.projects.find(x=>x.name.toLowerCase()===p.name.toLowerCase());
+      if(project){
+        if(!updateExisting){ skipped++; continue; }
+        const recalcNeeded = project.edd!==p.edd || project.lms!==p.lms || project.projectType!==p.projectType;
+        Object.assign(project, {em:p.em, workflow:p.workflow, projectType:p.projectType, lms:p.lms, edd:p.edd, currentStageId:p.currentStageId});
+        if(p.manualStatus) project.manualStatus = p.manualStatus;
+        project.progressStatus = p.progressStatus;
+        project.completedOnTrack = p.progressStatus==='Completed' ? (p.completedOnTrack!==null ? p.completedOnTrack : (project.completedOnTrack ?? computeOnTrack(project))) : null;
+        project.completedAt = p.progressStatus==='Completed' ? (project.completedAt || TODAY) : null;
+        if(p.blockerTeam) project.blockerTeam = p.blockerTeam;
+        if(p.offTrackReason) project.offTrackReason = p.offTrackReason;
+        if(recalcNeeded){ project.stageDates = {}; computeStageDates(project); }
+        updated++;
+      } else {
+        project = {
+          id: uid('p'), name:p.name, em:p.em, workflow:p.workflow, projectType:p.projectType, lms:p.lms, edd:p.edd,
+          currentStageId:p.currentStageId, stageDates:{}, parallel:{}, manualStatus:p.manualStatus||'',
+          progressStatus:p.progressStatus, completedOnTrack:null, completedAt:null,
+          offTrackReason:p.offTrackReason||'', blockerTeam:p.blockerTeam||''
+        };
+        computeStageDates(project);
+        if(project.progressStatus==='Completed'){
+          project.completedOnTrack = p.completedOnTrack!==null ? p.completedOnTrack : computeOnTrack(project);
+          project.completedAt = TODAY;
+        }
+        STATE.projects.push(project);
+        if(project.blockerTeam) await addHistoryEntry({projectId:project.id, team:project.blockerTeam, date:TODAY});
+        added++;
+      }
+      Object.entries(p.stageEdits).forEach(([stageId, val])=>{
+        const cur = project.stageDates[stageId];
+        if(!cur || (cur.start===val.start && cur.end===val.end)) return;
+        project.stageDates[stageId] = {start:val.start, end:val.end, approved:true};
+        edits++;
+      });
+      computeStageDates(project);
+      // Bulk import skips the per-row "someone else changed this" prompt (that many dialogs
+      // would be unusable) — it saves directly, so a large import can overwrite concurrent edits.
+      const result = await saveProject(project, true, true);
+      if(!result.saved) failedRows.push({row:p.row, name:p.name, project});
+      await sleep(180);
+    }
+    renderTracker();
+    if(failedRows.length===0){
+      closeModal();
+      showToast(`Added ${added}, updated ${updated}${skipped?`, skipped ${skipped}`:''}.${edits?` ${edits} stage date change(s) applied.`:''}`, 'success', 4000);
+    } else {
+      showCsvRetryModal(failedRows, {added, updated, skipped, edits});
+    }
+  };
+  showModal();
+}
+
+function showCsvRetryModal(failedRows, summary){
+  const body = document.getElementById('modalBody');
+  body.innerHTML = `
+    <button class="modal-close" id="mClose">✕</button>
+    <h2>${failedRows.length} row(s) didn't save</h2>
+    <p class="modal-sub">Added ${summary.added}, updated ${summary.updated}${summary.skipped?`, skipped ${summary.skipped}`:''} successfully — those are already reflected in the Tracker. The rows below hit a storage error and are currently only held in this browser tab; they won't persist unless you retry successfully or re-import.</p>
+    <div style="max-height:280px;overflow:auto;border:1px solid var(--hairline-soft);border-radius:8px;margin-bottom:16px">
+      <table><thead><tr><th>CSV Row</th><th>Project</th></tr></thead><tbody>
+        ${failedRows.map(f=>`<tr><td class="mono">${f.row}</td><td>${escapeHtml(f.name)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="mCloseFailed">Close (discard unsaved)</button>
+      <button class="btn primary" id="mRetryFailed">Retry ${failedRows.length} row(s)</button>
+    </div>
+  `;
+  document.getElementById('mClose').onclick = ()=>{ closeModal(); renderTracker(); };
+  document.getElementById('mCloseFailed').onclick = ()=>{ closeModal(); renderTracker(); };
+  document.getElementById('mRetryFailed').onclick = async ()=>{
+    const stillFailed = [];
+    for(const f of failedRows){
+      const result = await saveProject(f.project, true, true);
+      if(!result.saved) stillFailed.push(f);
+      await sleep(200);
+    }
+    renderTracker();
+    if(stillFailed.length===0){
+      closeModal();
+      showToast(`All ${failedRows.length} remaining row(s) saved successfully.`, 'success');
+    } else {
+      showCsvRetryModal(stillFailed, summary);
+    }
+  };
+  showModal();
+}
+
+/* ============================== MODAL PLUMBING ============================== */
+function showModal(){ document.getElementById('modalBackdrop').classList.add('show'); }
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('show'); }
+
+// Custom in-page confirm dialog. IMPORTANT: this app does NOT use window.confirm()/window.alert()
+// anywhere — Claude's artifact preview runs in a sandboxed iframe that can silently block native
+// browser dialogs (confirm() just returns false with no visible prompt at all, no error thrown).
+// That's a fail-silent trap: code written as `if(!confirm(...)) return;` would quietly abort every
+// time with zero feedback. This renders a real on-page dialog instead, so it always actually shows.
+function confirmDialog(message, opts){
+  opts = opts || {};
+  return new Promise(resolve=>{
+    const backdrop = document.createElement('div');
+    backdrop.className = 'confirm-backdrop';
+    backdrop.innerHTML = `
+      <div class="confirm-box">
+        <p class="confirm-msg">${escapeHtml(message).replace(/\n/g,'<br>')}</p>
+        <div class="confirm-actions">
+          <button class="btn ghost" id="confirmCancelBtn">${escapeHtml(opts.cancelLabel||'Cancel')}</button>
+          <button class="btn ${opts.danger?'danger':'primary'}" id="confirmOkBtn">${escapeHtml(opts.okLabel||'OK')}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(backdrop);
+    const finish = result=>{ backdrop.remove(); resolve(result); };
+    backdrop.querySelector('#confirmOkBtn').onclick = ()=>finish(true);
+    backdrop.querySelector('#confirmCancelBtn').onclick = ()=>finish(false);
+    backdrop.addEventListener('click', e=>{ if(e.target===backdrop) finish(false); });
+  });
+}
+
+// Small non-blocking confirmation, used instead of alert() for routine save/delete feedback
+// so day-to-day edits don't require dismissing a popup every time.
+function showToast(message, type, duration){
+  type = type || 'success';
+  duration = duration || 2600;
+  const container = document.getElementById('toastContainer');
+  if(!container) return;
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span class="toast-icon">${type==='success'?'✓':'✕'}</span><span>${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+  requestAnimationFrame(()=>toast.classList.add('show'));
+  setTimeout(()=>{
+    toast.classList.remove('show');
+    setTimeout(()=>toast.remove(), 250);
+  }, duration);
+}
+document.getElementById('modalBackdrop').addEventListener('click', e=>{
+  if(e.target.id==='modalBackdrop') closeModal();
+});
+
+/* ============================== RENDER: SUMMARY ============================== */
+function renderSummary(){
+  const el = document.getElementById('tab-summary');
+  const allProjects = STATE.projects;
+  const projects = activeProjects(); // most panels below are about CURRENT/active work — Completed projects live in Archive
+  const onCount = projects.filter(computeOnTrack).length;
+  const offCount = projects.length - onCount;
+
+  // Completion track record — this is the one section that's specifically ABOUT completed projects
+  const completedProjects = allProjects.filter(p=>p.progressStatus==='Completed');
+  const inProgressCount = projects.length;
+  const completedOnCount = completedProjects.filter(p=>p.completedOnTrack).length;
+  const completedOffCount = completedProjects.length - completedOnCount;
+  const completedByEm = {};
+  completedProjects.forEach(p=>{ (completedByEm[p.em]=completedByEm[p.em]||[]).push(p); });
+
+  // Workflow-wise breakdown (New vs Old): stage distribution, System Status, EM Status
+  const workflowGroups = {};
+  projects.forEach(p=>{ (workflowGroups[p.workflow]=workflowGroups[p.workflow]||[]).push(p); });
+  const workflowStageRows = Object.entries(workflowGroups).map(([wf, ps])=>{
+    const counts = STAGES.map(s=>ps.filter(p=>p.currentStageId===s.id).length);
+    return {wf, counts, total: ps.length};
+  });
+
+  // EM wise on/off
+  const emGroups = {};
+  projects.forEach(p=>{ (emGroups[p.em]=emGroups[p.em]||[]).push(p); });
+
+  // EM wise stage distribution
+  const emStageRows = Object.entries(emGroups).map(([em, ps])=>{
+    const counts = STAGES.map(s=>ps.filter(p=>p.currentStageId===s.id).length);
+    return {em, counts, total: ps.length};
+  });
+
+  // EDD month grouping
+  const monthGroups = {};
+  projects.forEach(p=>{ const mk=monthKey(p.edd); (monthGroups[mk]=monthGroups[mk]||[]).push(p); });
+  const monthKeysSorted = Object.keys(monthGroups).sort((a,b)=> new Date('1 '+a) - new Date('1 '+b));
+
+  // blocker summary (current) + historical
+  const blockerCounts = {};
+  projects.forEach(p=>{ if(p.blockerTeam) blockerCounts[p.blockerTeam]=(blockerCounts[p.blockerTeam]||0)+1; });
+  const histCounts = {};
+  STATE.blockerHistory.forEach(h=>{ histCounts[h.team]=(histCounts[h.team]||0)+1; });
+  const maxHist = Math.max(1, ...Object.values(histCounts));
+
+  const stageColor = i => `hsl(${38 - i*3.4}, ${70-i}%, ${50+i*0.6}%)`;
+
+  // System (formula) vs EM/PM (manual) status cross-check
+  let statusMatches = 0, emPessimistic = 0, emOptimistic = 0;
+  const mismatchRows = [];
+  const notSetRows = [];
+  projects.forEach(p=>{
+    const sys = computeOnTrack(p) ? 'On-track' : 'Off-track';
+    if(!p.manualStatus){ notSetRows.push(p); return; }
+    if(p.manualStatus===sys){ statusMatches++; return; }
+    if(p.manualStatus==='Off-track' && sys==='On-track'){ emPessimistic++; mismatchRows.push({p, sys}); }
+    else { emOptimistic++; mismatchRows.push({p, sys}); }
+  });
+
+  el.innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi"><div class="val mono">${projects.length}</div><div class="lbl">Total projects</div></div>
+      <div class="kpi green"><div class="val mono">${onCount}</div><div class="lbl">On-track</div></div>
+      <div class="kpi red"><div class="val mono">${offCount}</div><div class="lbl">Off-track</div></div>
+      <div class="kpi amber"><div class="val mono">${projects.reduce((a,p)=>a+p.lms,0)}</div><div class="lbl">Total LMs in flight</div></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Workflow Breakdown <span class="tag">New vs Old, active projects only</span></div>
+      <div class="grid-3">
+        <div>
+          <div class="rule-row-label" style="margin-bottom:8px">By Stage</div>
+          <div class="stacked-legend">${STAGES.map((s,i)=>`<span><span class="sw" style="background:hsl(${38 - i*3.4}, ${70-i}%, ${50+i*0.6}%)"></span>${s.abbr}</span>`).join('')}</div>
+          ${workflowStageRows.map(r=>`
+            <div class="barchart-row">
+              <div class="label">${r.wf}</div>
+              <div class="barchart-track">${r.counts.map((c,i)=> c>0?`<div class="barchart-seg" style="width:${c/r.total*100}%;background:hsl(${38 - i*3.4}, ${70-i}%, ${50+i*0.6}%)" title="${STAGES[i].name}: ${c}"></div>`:'').join('')}</div>
+              <div class="barchart-count">${r.total}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div>
+          <div class="rule-row-label" style="margin-bottom:8px">By System Status</div>
+          ${Object.entries(workflowGroups).map(([wf,ps])=>{
+            const on = ps.filter(computeOnTrack).length; const off = ps.length-on;
+            return `<div class="barchart-row">
+              <div class="label">${wf}</div>
+              <div class="barchart-track">
+                <div class="barchart-seg" style="width:${on/ps.length*100}%;background:var(--green)"></div>
+                <div class="barchart-seg" style="width:${off/ps.length*100}%;background:var(--red)"></div>
+              </div>
+              <div class="barchart-count">${ps.length}</div>
+            </div>`;
+          }).join('')}
+          <div class="stacked-legend" style="margin-top:8px"><span><span class="sw" style="background:var(--green)"></span>On-track</span><span><span class="sw" style="background:var(--red)"></span>Off-track</span></div>
+        </div>
+        <div>
+          <div class="rule-row-label" style="margin-bottom:8px">By EM Status</div>
+          ${Object.entries(workflowGroups).map(([wf,ps])=>{
+            const on = ps.filter(p=>p.manualStatus==='On-track').length;
+            const off = ps.filter(p=>p.manualStatus==='Off-track').length;
+            const unset = ps.length - on - off;
+            return `<div class="barchart-row">
+              <div class="label">${wf}</div>
+              <div class="barchart-track">
+                <div class="barchart-seg" style="width:${on/ps.length*100}%;background:var(--green)"></div>
+                <div class="barchart-seg" style="width:${off/ps.length*100}%;background:var(--red)"></div>
+                <div class="barchart-seg" style="width:${unset/ps.length*100}%;background:var(--muted-2)"></div>
+              </div>
+              <div class="barchart-count">${ps.length}</div>
+            </div>`;
+          }).join('')}
+          <div class="stacked-legend" style="margin-top:8px"><span><span class="sw" style="background:var(--green)"></span>On-track</span><span><span class="sw" style="background:var(--red)"></span>Off-track</span><span><span class="sw" style="background:var(--muted-2)"></span>Not set</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">System vs EM/PM Status <span class="tag">formula-based vs self-reported</span></div>
+      <p style="color:var(--muted);font-size:12.5px;margin:-6px 0 16px">The System Status column is calculated purely from stage dates. EM Status is whatever the EM/PM has manually set on the Tracker. This flags where the two disagree, so it's worth a second look.</p>
+      <div class="kpi-row" style="margin-bottom:${(mismatchRows.length||notSetRows.length)?'16px':'0'}">
+        <div class="kpi green"><div class="val mono">${statusMatches}</div><div class="lbl">Agree</div></div>
+        <div class="kpi amber"><div class="val mono">${emPessimistic}</div><div class="lbl">EM flags risk, formula says fine</div></div>
+        <div class="kpi red"><div class="val mono">${emOptimistic}</div><div class="lbl">EM says fine, formula flags risk</div></div>
+        <div class="kpi"><div class="val mono">${notSetRows.length}</div><div class="lbl">Not yet set by EM/PM</div></div>
+      </div>
+      ${(mismatchRows.length || notSetRows.length) ? `
+        <table>
+          <thead><tr><th>Project</th><th>EM/PM</th><th>System Status</th><th>EM Status</th></tr></thead>
+          <tbody>
+            ${mismatchRows.map(r=>`
+              <tr>
+                <td class="pname">${escapeHtml(r.p.name)}</td>
+                <td>${escapeHtml(r.p.em)}</td>
+                <td><span class="pill ${r.sys==='On-track'?'on':'off'}"><span class="dot"></span>${r.sys}</span></td>
+                <td><span class="pill ${r.p.manualStatus==='On-track'?'on':'off'}"><span class="dot"></span>${r.p.manualStatus}</span></td>
+              </tr>`).join('')}
+            ${notSetRows.map(p=>{
+              const sys = computeOnTrack(p) ? 'On-track' : 'Off-track';
+              return `<tr style="opacity:.6">
+                <td class="pname">${escapeHtml(p.name)}</td>
+                <td>${escapeHtml(p.em)}</td>
+                <td><span class="pill ${sys==='On-track'?'on':'off'}"><span class="dot"></span>${sys}</span></td>
+                <td style="color:var(--muted-2)">Not set</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      ` : `<p style="color:var(--muted);font-size:13px">Every EM/PM status agrees with the formula-based status — nothing to review.</p>`}
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Completion Track Record <span class="tag">on-track state frozen at the moment each project finished</span></div>
+      <div class="kpi-row" style="margin-bottom:${completedProjects.length?'16px':'0'}">
+        <div class="kpi"><div class="val mono">${inProgressCount}</div><div class="lbl">In Progress</div></div>
+        <div class="kpi"><div class="val mono">${completedProjects.length}</div><div class="lbl">Completed</div></div>
+        <div class="kpi green"><div class="val mono">${completedOnCount}</div><div class="lbl">Completed on-track</div></div>
+        <div class="kpi red"><div class="val mono">${completedOffCount}</div><div class="lbl">Completed off-track</div></div>
+      </div>
+      ${completedProjects.length ? `
+        <div class="stacked-legend"><span><span class="sw" style="background:var(--green)"></span>Finished on-track</span><span><span class="sw" style="background:var(--red)"></span>Finished off-track</span></div>
+        ${Object.entries(completedByEm).map(([em,ps])=>{
+          const on = ps.filter(p=>p.completedOnTrack).length; const off = ps.length-on;
+          return `<div class="barchart-row">
+            <div class="label">${escapeHtml(em)}</div>
+            <div class="barchart-track">
+              <div class="barchart-seg" style="width:${on/ps.length*100}%;background:var(--green)"></div>
+              <div class="barchart-seg" style="width:${off/ps.length*100}%;background:var(--red)"></div>
+            </div>
+            <div class="barchart-count">${ps.length}</div>
+          </div>`;
+        }).join('')}
+      ` : `<p style="color:var(--muted);font-size:13px">No projects marked Completed yet — this fills in as projects wrap up.</p>`}
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="section-title">EM-wise — On-track vs Off-track</div>
+        ${Object.entries(emGroups).map(([em,ps])=>{
+          const on = ps.filter(computeOnTrack).length; const off = ps.length-on;
+          return `<div class="barchart-row">
+            <div class="label">${escapeHtml(em)}</div>
+            <div class="barchart-track">
+              <div class="barchart-seg" style="width:${on/ps.length*100}%;background:var(--green)"></div>
+              <div class="barchart-seg" style="width:${off/ps.length*100}%;background:var(--red)"></div>
+            </div>
+            <div class="barchart-count">${ps.length}</div>
+          </div>`;
+        }).join('')}
+        <div class="stacked-legend" style="margin-top:10px"><span><span class="sw" style="background:var(--green)"></span>On-track</span><span><span class="sw" style="background:var(--red)"></span>Off-track</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">EM-wise — Projects by Stage</div>
+        <div class="stacked-legend">${STAGES.map((s,i)=>`<span><span class="sw" style="background:${stageColor(i)}"></span>${s.abbr}</span>`).join('')}</div>
+        ${emStageRows.map(r=>`
+          <div class="barchart-row">
+            <div class="label">${escapeHtml(r.em)}</div>
+            <div class="barchart-track">${r.counts.map((c,i)=> c>0?`<div class="barchart-seg" style="width:${c/r.total*100}%;background:${stageColor(i)}" title="${STAGES[i].name}: ${c}"></div>`:'').join('')}</div>
+            <div class="barchart-count">${r.total}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">EDD Month — On-track vs Off-track</div>
+      <div class="month-grid">
+        ${monthKeysSorted.map(mk=>{
+          const ps = monthGroups[mk]; const on = ps.filter(computeOnTrack).length; const off = ps.length-on;
+          return `<div class="month-card">
+            <div class="m">${mk}</div>
+            <div class="row"><span style="color:var(--green)">On-track</span><span class="mono">${on}</span></div>
+            <div class="row"><span style="color:var(--red)">Off-track</span><span class="mono">${off}</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">EDD Month — Projects by Stage</div>
+      <div class="stacked-legend">${STAGES.map((s,i)=>`<span><span class="sw" style="background:${stageColor(i)}"></span>${s.abbr}</span>`).join('')}</div>
+      ${monthKeysSorted.map(mk=>{
+        const ps = monthGroups[mk];
+        const counts = STAGES.map(s=>ps.filter(p=>p.currentStageId===s.id).length);
+        return `<div class="barchart-row">
+          <div class="label">${mk}</div>
+          <div class="barchart-track">${counts.map((c,i)=> c>0?`<div class="barchart-seg" style="width:${c/ps.length*100}%;background:${stageColor(i)}" title="${STAGES[i].name}: ${c}"></div>`:'').join('')}</div>
+          <div class="barchart-count">${ps.length}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="section-title">Currently Blocked — by Team</div>
+        ${Object.keys(blockerCounts).length===0?`<p style="color:var(--muted);font-size:13px">No projects currently flagged with a blocking team.</p>`:
+        Object.entries(blockerCounts).sort((a,b)=>b[1]-a[1]).map(([team,c])=>`
+          <div class="barchart-row"><div class="label">${team}</div><div class="barchart-track"><div class="barchart-seg" style="width:100%;background:var(--red)"></div></div><div class="barchart-count">${c}</div></div>
+        `).join('')}
+      </div>
+      <div class="panel">
+        <div class="section-title">Historical Blocker Frequency <span class="tag">all-time, by team</span></div>
+        ${Object.keys(histCounts).length===0?`<p style="color:var(--muted);font-size:13px">No historical blocker data yet.</p>`:
+        Object.entries(histCounts).sort((a,b)=>b[1]-a[1]).map(([team,c])=>`
+          <div class="team-block-card">
+            <div class="head"><span class="name">${team}</span><span class="count">${c}×</span></div>
+            <div class="hist-bar-bg"><div class="hist-bar-fill" style="width:${c/maxHist*100}%"></div></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* ============================== RENDER: TEAM LOAD ============================== */
+/* ---------- Monthly forecast, derived from the Tracker's back-calculated Project Plan ---------- */
+function buildForecastEntries(stageIds){
+  const entries = [];
+  activeProjects().forEach(p=>{
+    stageIds.forEach(sid=>{
+      const d = p.stageDates[sid];
+      if(!d) return;
+      entries.push({ projectName:p.name, lms:p.lms, stageName:STAGE_BY_ID[sid].name, month:monthKey(d.start), start:d.start, end:d.end });
+    });
+  });
+  return entries;
+}
+function sortedMonths(entries){
+  const uniq = [...new Set(entries.map(e=>e.month))];
+  return uniq.sort((a,b)=> new Date('1 '+a) - new Date('1 '+b));
+}
+function renderForecastDetailed(team, stageIds){
+  const entries = buildForecastEntries(stageIds);
+  const months = sortedMonths(entries);
+  return `<div class="panel" style="margin-bottom:16px">
+    <div class="section-title">${team} — Monthly Intake <span class="tag">project-wise, from Project Plan</span></div>
+    ${months.length===0?`<p style="color:var(--muted);font-size:12.5px">No stages scheduled for ${team} yet.</p>`:
+    `<div class="month-forecast-grid">${months.map(m=>{
+      const rows = entries.filter(e=>e.month===m);
+      const totalLms = rows.reduce((a,e)=>a+e.lms,0);
+      return `<div class="forecast-month">
+        <div class="fm-head">${m}<span class="fm-total">${totalLms} LM · ${rows.length} item(s)</span></div>
+        ${rows.map(e=>`<div class="fm-row"><b>${escapeHtml(e.projectName)}</b><span class="fm-stage">${e.stageName}</span><span class="fm-lms">${e.lms} LM</span></div>`).join('')}
+      </div>`;
+    }).join('')}</div>`}
+  </div>`;
+}
+function renderForecastAggregate(team, stageIds){
+  const entries = buildForecastEntries(stageIds);
+  const months = sortedMonths(entries);
+  return `<div class="panel" style="margin-bottom:16px">
+    <div class="section-title">${team} — Monthly Intake <span class="tag">by stage, from Project Plan</span></div>
+    ${months.length===0?`<p style="color:var(--muted);font-size:12.5px">No stages scheduled for ${team} yet.</p>`:
+    `<table><thead><tr><th>Month</th><th>Stage</th><th># Projects</th><th>Total LMs</th></tr></thead><tbody>
+      ${months.map(m=>{
+        const rows = entries.filter(e=>e.month===m);
+        const byStage = {};
+        rows.forEach(e=>{ (byStage[e.stageName]=byStage[e.stageName]||{count:0,lms:0}); byStage[e.stageName].count++; byStage[e.stageName].lms+=e.lms; });
+        return Object.entries(byStage).map(([stageName,agg],idx)=>`
+          <tr>
+            <td class="mono">${idx===0?m:''}</td>
+            <td>${stageName}</td>
+            <td class="mono">${agg.count}</td>
+            <td class="mono">${agg.lms}</td>
+          </tr>`).join('');
+      }).join('')}
+    </tbody></table>`}
+  </div>`;
+}
+
+function renderTeamLoad(){
+  const el = document.getElementById('tab-teamload');
+  const teamStageMap = {};
+  STAGES.forEach(s=>{ (teamStageMap[STATE.config.teamMap[s.id]] = teamStageMap[STATE.config.teamMap[s.id]]||[]).push(s); });
+
+  el.innerHTML = `
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Work Expectation by Team <span class="tag">live, based on current stage</span></div>
+      <p style="color:var(--muted);font-size:12.5px;margin:-6px 0 0">Which projects and how many LMs each team should expect right now, based on the stage(s) they own.</p>
+    </div>
+    <div class="grid-2" style="margin-bottom:24px">
+      ${Object.entries(teamStageMap).map(([team, stages])=>{
+        const stageIds = stages.map(s=>s.id);
+        const ps = activeProjects().filter(p=>stageIds.includes(p.currentStageId));
+        const totalLms = ps.reduce((a,p)=>a+p.lms,0);
+        return `<div class="team-card">
+          <div class="thead">
+            <div>
+              <h3>${team}</h3>
+              <div class="stages">${stages.map(s=>s.name).join(' · ')}</div>
+            </div>
+            <div class="stat"><div class="n mono">${ps.length}</div><div class="l">Active projects</div></div>
+          </div>
+          <div class="stat" style="text-align:left"><span class="mono" style="font-size:18px;color:var(--amber)">${totalLms}</span> <span style="color:var(--muted-2);font-size:11px;text-transform:uppercase">LMs in scope</span></div>
+          <div class="team-proj-list">
+            ${ps.length===0?`<div style="color:var(--muted-2);font-size:12px;padding:4px 0">No projects currently in this team's stages.</div>`:
+            ps.map(p=>`<div class="team-proj-row"><b>${escapeHtml(p.name)}</b> <span class="st">${STAGE_BY_ID[p.currentStageId].abbr}</span><span class="lm">${p.lms} LM</span></div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    ${(()=>{
+      const aiDataOpsStages = STAGES.filter(s=>STATE.config.teamMap[s.id]==='AIDataOps').map(s=>s.id);
+      const seStages = STAGES.filter(s=>STATE.config.teamMap[s.id]==='SE').map(s=>s.id);
+      const dsStages = STAGES.filter(s=>STATE.config.teamMap[s.id]==='DS').map(s=>s.id);
+      return `
+        ${aiDataOpsStages.length ? renderForecastDetailed('AIDataOps', aiDataOpsStages) : ''}
+        ${seStages.length ? renderForecastAggregate('SE', seStages) : ''}
+        ${dsStages.length ? renderForecastAggregate('DS', dsStages) : ''}
+        <p style="color:var(--muted-2);font-size:11.5px;margin-top:-8px">BA is skipped from this monthly forecast, per request. Both aggregate views group by the month each stage is scheduled to start.</p>
+      `;
+    })()}
+  `;
+}
+
+/* ============================== RENDER: ARCHIVE ==============================
+   Home for Completed projects. Marking a project "Completed" in the Tracker's Progress
+   dropdown moves it here automatically (it's simply excluded from activeProjects()); nothing
+   special has to happen at the moment of completion beyond that. */
+function archivedProjects(){ return STATE.projects.filter(p=>p.progressStatus==='Completed'); }
+
+const ARCHIVE_SORT_ACCESSORS = {
+  name: p => p.name.toLowerCase(),
+  em: p => p.em.toLowerCase(),
+  workflow: p => p.workflow.toLowerCase(),
+  type: p => p.projectType,
+  lms: p => p.lms,
+  edd: p => p.edd,
+  completedAt: p => p.completedAt || '',
+  completedStatus: p => p.completedOnTrack ? 1 : 0,
+};
+function filteredArchive(){
+  return archivedProjects().filter(p=>{
+    if(archiveFilters.em.length && !archiveFilters.em.includes(p.em)) return false;
+    if(archiveFilters.workflow.length && !archiveFilters.workflow.includes(p.workflow)) return false;
+    if(archiveFilters.type.length && !archiveFilters.type.includes(p.projectType)) return false;
+    if(archiveFilters.completedStatus.length){
+      const s = p.completedOnTrack ? 'on' : 'off';
+      if(!archiveFilters.completedStatus.includes(s)) return false;
+    }
+    if(archiveFilters.q && !p.name.toLowerCase().includes(archiveFilters.q.toLowerCase()) && !p.em.toLowerCase().includes(archiveFilters.q.toLowerCase())) return false;
+    return true;
+  });
+}
+function sortArchive(list){
+  if(!archiveSortState.key) return list;
+  const accessor = ARCHIVE_SORT_ACCESSORS[archiveSortState.key];
+  if(!accessor) return list;
+  const dir = archiveSortState.dir==='asc' ? 1 : -1;
+  return [...list].sort((a,b)=>{
+    const av=accessor(a), bv=accessor(b);
+    if(av<bv) return -1*dir;
+    if(av>bv) return 1*dir;
+    return a.name.localeCompare(b.name);
+  });
+}
+function setArchiveSort(key){
+  if(archiveSortState.key===key){ archiveSortState.dir = archiveSortState.dir==='asc' ? 'desc' : 'asc'; }
+  else{ archiveSortState = {key, dir:'asc'}; }
+  renderArchive();
+}
+function archiveSortArrow(key){
+  if(archiveSortState.key!==key) return `<span class="sort-arrow idle">⇅</span>`;
+  return `<span class="sort-arrow active">${archiveSortState.dir==='asc'?'▲':'▼'}</span>`;
+}
+
+function renderArchive(){
+  const el = document.getElementById('tab-archive');
+  const all = archivedProjects();
+  const ems = [...new Set(all.map(p=>p.em))].sort();
+  const list = sortArchive(filteredArchive());
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="section-title">Archive <span class="tag">${list.length} of ${all.length} completed</span>
+        <span style="flex:1"></span>
+        <button class="btn ghost small" id="btnArchiveExport">Export CSV</button>
+      </div>
+      <p style="color:var(--muted);font-size:12.5px;margin:-6px 0 16px">Projects land here automatically once their Progress is set to Completed on the Tracker. Restore one to bring it back to active work.</p>
+      <div class="filterbar">
+        <div class="field"><label>Search</label><input type="text" id="aQ" placeholder="Project or EM/PM..." value="${escapeHtml(archiveFilters.q)}"></div>
+        ${renderMultiselect(archiveFilters, 'em', 'EM/PM', ems.map(e=>({value:e, label:e})))}
+        ${renderMultiselect(archiveFilters, 'workflow', 'Workflow', WORKFLOWS.map(w=>({value:w, label:w})))}
+        ${renderMultiselect(archiveFilters, 'type', 'Type', PROJECT_TYPES.map(t=>({value:t, label:t})))}
+        ${renderMultiselect(archiveFilters, 'completedStatus', 'Finished', [{value:'on',label:'On-track'},{value:'off',label:'Off-track'}])}
+        <div class="field"><button class="btn ghost small" id="btnClearArchiveFilters">Clear filters</button></div>
+      </div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th style="width:40px">S No</th>
+          <th class="sortable" data-sort="name">Project ${archiveSortArrow('name')}</th>
+          <th class="sortable" data-sort="workflow">Workflow ${archiveSortArrow('workflow')}</th>
+          <th class="sortable" data-sort="type">Type ${archiveSortArrow('type')}</th>
+          <th class="sortable" data-sort="lms">LMs ${archiveSortArrow('lms')}</th>
+          <th class="sortable" data-sort="edd">EDD ${archiveSortArrow('edd')}</th>
+          <th class="sortable" data-sort="completedAt">Completed ${archiveSortArrow('completedAt')}</th>
+          <th class="sortable" data-sort="completedStatus">Finished ${archiveSortArrow('completedStatus')}</th>
+          <th>Blocker (historical)</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${list.length===0 ? `<tr class="empty-row"><td colspan="10">No completed projects match these filters.</td></tr>` : list.map((p,i)=>renderArchiveRow(p,i+1)).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('aQ').oninput = e=>{
+    archiveFilters.q = e.target.value;
+    const caret = e.target.selectionStart;
+    renderArchive();
+    const revived = document.getElementById('aQ');
+    revived.focus();
+    revived.setSelectionRange(caret, caret);
+  };
+  wireMultiselects(el, archiveFilters, renderArchive);
+  document.getElementById('btnClearArchiveFilters').onclick = ()=>{
+    archiveFilters = {em:[],workflow:[],type:[],completedStatus:[],q:''};
+    openMultiselect = null;
+    renderArchive();
+  };
+  el.querySelectorAll('th.sortable').forEach(th=>{ th.onclick = ()=>setArchiveSort(th.dataset.sort); });
+  document.getElementById('btnArchiveExport').onclick = ()=>{
+    const rows = all.map(p=>[p.name, p.em, p.workflow, p.projectType, p.lms, p.edd, p.completedAt||'', p.completedOnTrack?'On-track':'Off-track', p.blockerTeam||'', p.offTrackReason||'']);
+    const cols = ['Project Name','EM/PM Name','Workflow','Type','LMs','Project EDD','Completed Date','Finished','Blocker Team','Off-Track Reason'];
+    const csv = [cols, ...rows].map(r=>r.map(csvCell).join(',')).join('\n');
+    triggerDownload('milepost-archive.csv', csv);
+  };
+  list.forEach(p=>{
+    const restoreBtn = document.getElementById('archiveRestore_'+p.id);
+    if(restoreBtn) restoreBtn.onclick = async ()=>{
+      p.progressStatus = 'In Progress';
+      p.completedOnTrack = null;
+      p.completedAt = null;
+      await saveProject(p);
+      renderArchive();
+    };
+    const editBtn = document.getElementById('archiveEdit_'+p.id);
+    if(editBtn) editBtn.onclick = ()=>openProjectModal(p.id);
+  });
+}
+
+function renderArchiveRow(p, sNo){
+  return `
+    <tr>
+      <td class="mono" style="color:var(--muted-2)">${sNo}</td>
+      <td>
+        <div class="pname">${escapeHtml(p.name)}</div>
+        <div class="psub">${escapeHtml(p.em)}</div>
+      </td>
+      <td><span class="wf-pill">${p.workflow}</span></td>
+      <td><span class="type-pill type-${p.projectType}">${p.projectType}</span></td>
+      <td class="mono">${p.lms}</td>
+      <td class="mono">${fmtDate(p.edd)}</td>
+      <td class="mono">${fmtDate(p.completedAt)}</td>
+      <td><div class="completed-tag ${p.completedOnTrack?'on':'off'}" style="margin-top:0">${p.completedOnTrack?'✓ On-track':'✕ Off-track'}</div></td>
+      <td>${p.blockerTeam ? `<div class="blocker-tag"><b>${escapeHtml(p.blockerTeam)}</b><br>${escapeHtml(p.offTrackReason||'')}</div>` : `<span style="color:var(--muted-2);font-size:12px">—</span>`}</td>
+      <td>
+        <div class="actions-cell">
+          <button class="icon-btn" id="archiveRestore_${p.id}" title="Restore to In Progress">↩</button>
+          <button class="icon-btn" id="archiveEdit_${p.id}" title="Edit project">✎</button>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+/* ============================== RENDER: READ ME ============================== */
+function renderReadme(){
+  const el = document.getElementById('tab-readme');
+  el.innerHTML = `
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">What is MILEPOST?</div>
+      <p style="color:var(--muted);font-size:13px;line-height:1.7">
+        MILEPOST tracks projects through an 11-stage delivery pipeline, back-calculates a schedule for every stage from each project's target completion date (EDD), and flags automatically when something is running behind. It's a shared workspace — everyone sees the same data, and it updates as people edit.
+      </p>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">The Stage Pipeline</div>
+      <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:12px">Every project moves through these 11 stages in order (a stage can be marked "parallel" to run alongside the one before it instead):</p>
+      <div class="readme-stage-list">
+        ${STAGES.map((s,i)=>`<div class="readme-stage-chip"><span class="mono">${i+1}.</span> ${s.name} <span class="readme-stage-team">${STATE.config.teamMap[s.id]}</span></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Module: Tracker</div>
+      <div class="readme-block">
+        <b>Project EDD</b> — the target completion date you set. Every stage's start/end date is back-calculated from this, working backwards through the pipeline, using <b>business days only</b> (weekends don't count as elapsed time).
+      </div>
+      <div class="readme-block">
+        <b>System Status</b> (On-track / Off-track) — calculated automatically. A project is off-track if today is past its current stage's planned end date. This is pure formula, not opinion.
+      </div>
+      <div class="readme-block">
+        <b>EM Status</b> — a separate, manually-set field where the EM/PM records their own read on the project (On-track / Off-track / Not set). The Summary tab's "System vs EM/PM Status" panel flags where these two disagree — that's usually worth a second look, in either direction.
+      </div>
+      <div class="readme-block">
+        <b>Estimated EDD</b> — a forward projection, separate from the original EDD. If the current stage is running late, this cascades the delay through every remaining stage to show a realistic new finish date. If nothing's late, it exactly equals the original EDD.
+      </div>
+      <div class="readme-block">
+        <b>Type (Dx / Tx / Both) and LMs</b> — these feed the duration formula in Settings: bigger projects and certain project types take proportionally longer per stage, automatically.
+      </div>
+      <div class="readme-block">
+        <b>Progress (In Progress / Completed)</b> — switching a project to Completed automatically records whether it was on-track or off-track at that exact moment, and moves it out of the Tracker into the <b>Archive</b> tab.
+      </div>
+      <div class="readme-block">
+        <b>Editing stage dates</b> (📅 icon) — lets you override the back-calculated schedule directly. Useful for one-off exceptions; changes apply immediately.
+      </div>
+      <div class="readme-block">
+        <b>Sorting, filtering, bulk actions</b> — every column header sorts (click again to reverse). Every filter (EM, Workflow, Type, Stage, System/EM Status, Blocker) is multi-select — check as many values as you want. Checkboxes on the left support bulk delete.
+      </div>
+      <div class="readme-block">
+        <b>CSV import/export</b> — "Download CSV template" gives you the exact expected format, including one column pair per stage if you want to bulk-set specific dates. Import can add new projects or update existing ones (matched by name); any row that fails to save shows you exactly which one, with a one-click retry.
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Module: Summary</div>
+      <div class="readme-block"><b>Workflow Breakdown</b> — New vs Old, by stage, by System Status, and by EM Status.</div>
+      <div class="readme-block"><b>System vs EM/PM Status</b> — where the formula and the human disagree.</div>
+      <div class="readme-block"><b>Completion Track Record</b> — of everything ever marked Completed, how many finished on-track vs off-track, broken down by EM.</div>
+      <div class="readme-block"><b>EM-wise and EDD-month views</b> — on-track/off-track counts and stage distribution, sliced by owner and by target month.</div>
+      <div class="readme-block"><b>Blocker summaries</b> — which team is currently blocking the most projects, and historically, which team has blocked the most overall.</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Module: Team Load</div>
+      <div class="readme-block"><b>Work Expectation by Team</b> — live snapshot of which projects and how many LMs each team should expect right now, based on whichever stage(s) they own (configurable in Settings).</div>
+      <div class="readme-block"><b>Monthly Intake forecast</b> — pulled from each project's full stage schedule (not just where it sits today): AIDataOps gets a project-by-project, month-by-month breakdown; SE and DS get aggregated month × stage counts. BA is intentionally excluded from this forecast.</div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Module: Archive</div>
+      <p style="color:var(--muted);font-size:13px;line-height:1.7">
+        Home for Completed projects — they land here automatically the moment Progress is switched to Completed on the Tracker, no extra step needed. Archive has its own search/filters and CSV export, and a <b>↩ Restore</b> button on each row to bring a project back to active work if it was completed by mistake.
+      </p>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Module: Settings</div>
+      <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:10px">Per stage, you control:</p>
+      <div class="readme-block"><b>Base business days</b> — the default duration for a typical project.</div>
+      <div class="readme-block"><b>Type multiplier</b> — separate scaling for Dx / Tx / Both projects.</div>
+      <div class="readme-block"><b>LMs-band multiplier</b> — six bands (&lt;500, 500–1,000, 1,000–5,000, 5,000–10,000, 10,000–25,000, &gt;25,000), each with its own multiplier.</div>
+      <div class="readme-block"><b>Owning team</b> — which team is responsible for that stage; this drives the Team Load module.</div>
+      <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-top:10px">Effective duration = Base days × Type multiplier × LMs-band multiplier, rounded to the nearest whole day. "Save & recalculate" re-derives every project's schedule under the new rules — it warns you first, since it touches everyone's data at once.</p>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">Data, Sharing & Reliability</div>
+      <div class="readme-block"><b>Shared workspace</b> — everyone who opens this sees and can edit the same data. Each project saves independently, so two people editing two different projects never collide; editing the exact same project at the same moment prompts whoever saves second to choose whether to overwrite.</div>
+      <div class="readme-block"><b>Staying in sync</b> — the app auto-refreshes roughly every 20 seconds (paused while you're actively editing) to pull in others' changes, or hit "↻ Refresh" any time. Settings is excluded from auto-refresh so it never wipes out an edit in progress.</div>
+      <div class="readme-block"><b>Resilience</b> — storage operations retry automatically on transient errors; toasts in the bottom-right confirm saves/deletes or tell you clearly if something didn't go through, rather than failing silently.</div>
+    </div>
+  `;
+}
+
+/* ============================== RENDER: SETTINGS ============================== */
+function renderSettings(){
+  const el = document.getElementById('tab-settings');
+  el.innerHTML = `
+    <div class="panel settings-panel">
+      <div class="section-title">Stage Duration Rules <span class="tag">drives back-calculation from EDD & Estimated EDD</span></div>
+      <p style="color:var(--muted);font-size:12.5px;margin:-6px 0 16px;line-height:1.6">
+        Effective business days for a stage = <span class="mono" style="color:var(--text)">Base business days × Type multiplier × LMs-band multiplier</span>, rounded to the nearest whole day (minimum 1). Weekends are skipped when laying out start/end dates — a 5-day stage starting Thursday runs Thu–Fri–Mon–Tue–Wed, not through the weekend. A project's LMs slot into exactly one band below.
+      </p>
+      <div class="rule-card-grid">
+        ${STAGES.map(s=>{
+          const r = STATE.config.stageRules[s.id];
+          return `
+          <div class="rule-card">
+            <div class="rule-card-head">
+              <div class="rule-card-title">${s.name}</div>
+              <select class="teamInput" data-stage="${s.id}">${TEAMS.map(t=>`<option ${STATE.config.teamMap[s.id]===t?'selected':''}>${t}</option>`).join('')}</select>
+            </div>
+            <div class="rule-row-label">Base business days</div>
+            <input type="number" min="1" class="ruleBase" data-stage="${s.id}" value="${r.base}" style="width:90px">
+
+            <div class="rule-row-label" style="margin-top:12px">Type multiplier</div>
+            <div class="rule-mult-grid rule-mult-grid-3">
+              ${PROJECT_TYPES.map(t=>`
+                <div class="rule-mult-cell">
+                  <label>${t}</label>
+                  <input type="number" step="0.05" min="0.1" class="ruleMult" data-stage="${s.id}" data-type="${t}" value="${r.mult[t]}">
+                </div>`).join('')}
+            </div>
+
+            <div class="rule-row-label" style="margin-top:12px">LMs-band multiplier</div>
+            <div class="rule-mult-grid rule-mult-grid-6">
+              ${LMS_BANDS.map(b=>`
+                <div class="rule-mult-cell">
+                  <label>${b.label}</label>
+                  <input type="number" step="0.05" min="0.1" class="ruleLmsMult" data-stage="${s.id}" data-band="${b.id}" value="${r.lmsMult[b.id]}">
+                </div>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="modal-foot" style="border-top:none;justify-content:flex-start;padding-top:16px">
+        <button class="btn primary" id="btnSaveSettings">Save & recalculate all projects</button>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-top:10px">Saving recalculates every project's stage schedule and Estimated EDD, unless a stage has an approved manual override in place.</p>
+    </div>
+  `;
+  document.getElementById('btnSaveSettings').onclick = async ()=>{
+    const proceed = await confirmDialog('This recalculates and re-saves every project\'s schedule. If a teammate has an edit in flight right now, this can overwrite it. Continue?', {okLabel:'Recalculate & Save'});
+    if(!proceed) return;
+    STAGES.forEach(s=>{
+      const rule = STATE.config.stageRules[s.id];
+      rule.base = parseInt(document.querySelector(`.ruleBase[data-stage="${s.id}"]`).value)||1;
+      rule.mult = rule.mult || {};
+      PROJECT_TYPES.forEach(t=>{
+        rule.mult[t] = parseFloat(document.querySelector(`.ruleMult[data-stage="${s.id}"][data-type="${t}"]`).value)||1;
+      });
+      rule.lmsMult = rule.lmsMult || {};
+      LMS_BANDS.forEach(b=>{
+        rule.lmsMult[b.id] = parseFloat(document.querySelector(`.ruleLmsMult[data-stage="${s.id}"][data-band="${b.id}"]`).value)||1;
+      });
+    });
+    document.querySelectorAll('.teamInput').forEach(sel=>{ STATE.config.teamMap[sel.dataset.stage] = sel.value; });
+    STATE.projects.forEach(p=>computeStageDates(p));
+    await saveAllRules();
+    const failed = await saveProjectsSequentially(STATE.projects, true);
+    renderTeamLoad();
+    showToast(`Settings saved and schedules recalculated for everyone.${failed.length?` ${failed.length} project(s) didn't save — try again in a moment.`:''}`, failed.length?'error':'success', 4000);
+  };
+}
+
+/* ============================== TABS ============================== */
+function setTab(tab){
+  activeTab = tab;
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  ['tracker','summary','teamload','archive','settings','readme'].forEach(t=>{
+    document.getElementById('tab-'+t).style.display = (t===tab)?'block':'none';
+  });
+  if(tab==='tracker') renderTracker();
+  if(tab==='summary') renderSummary();
+  if(tab==='teamload') renderTeamLoad();
+  if(tab==='archive') renderArchive();
+  if(tab==='settings') renderSettings();
+  if(tab==='readme') renderReadme();
+}
+document.getElementById('nav').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  setTab(btn.dataset.tab);
+});
+document.getElementById('btnRefreshNow').addEventListener('click', async ()=>{
+  if(activeTab==='settings'){
+    const proceed = await confirmDialog('Refreshing will discard any unsaved changes on this Settings screen. Continue?', {okLabel:'Refresh anyway', danger:true});
+    if(!proceed) return;
+  }
+  const label = document.getElementById('refreshLabel');
+  label.textContent = 'Refreshing…';
+  await refreshAll();
+});
+
+/* ============================== INIT ============================== */
+(async function init(){
+  const data = await loadAllData();
+  if(data.hasRules){
+    STAGES.forEach(s=>{ if(data.rules[s.id]) STATE.config.stageRules[s.id]=data.rules[s.id]; if(data.teamMap[s.id]) STATE.config.teamMap[s.id]=data.teamMap[s.id]; });
+  }
+  if(data.hasProjects){
+    STATE.projects = data.projects;
+    STATE.blockerHistory = data.history;
+    if(data.failedProjectKeys && data.failedProjectKeys.length){
+      showToast(`${data.failedProjectKeys.length} project(s) couldn't be loaded (storage read error). They still exist — click ↻ Refresh to try again.`, 'error', 6000);
+    }
+  } else {
+    // First time anyone has opened this — seed the shared workspace once, one write at a time.
+    const seedHistory = seed();
+    if(!data.hasRules){ await saveAllRules(); }
+    await saveProjectsSequentially(STATE.projects, true);
+    try{ await withRetry(()=>window.storage.set('milepost:history', JSON.stringify(seedHistory), SHARED)); }catch(e){ console.log('Seed history save failed (non-critical, best-effort):', e && e.message); }
+    STATE.blockerHistory = seedHistory;
+  }
+  lastRefreshedAt = new Date();
+  updateRefreshLabel();
+  setTab('tracker');
+})();
+</script>
+</body>
+</html>
