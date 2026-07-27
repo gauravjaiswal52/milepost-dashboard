@@ -431,14 +431,14 @@ tbody tr:hover{background:#0f1a26;}
 // used shared:true — a single shared workspace — so there's nothing to branch on here).
 window.storage = {
   async list(prefix, shared){
-    const r = await fetch('/api/storage/list?prefix=' + encodeURIComponent(prefix || ''));
+    const r = await fetch('/api/storage/list?prefix=' + encodeURIComponent(prefix || ''), { cache: 'no-store' });
     if(!r.ok) throw new Error('Storage list failed: ' + r.status);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
     return { keys: data.keys };
   },
   async get(key, shared){
-    const r = await fetch('/api/storage/get?key=' + encodeURIComponent(key));
+    const r = await fetch('/api/storage/get?key=' + encodeURIComponent(key), { cache: 'no-store' });
     if(!r.ok) throw new Error('Storage get failed: ' + r.status);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
@@ -448,6 +448,7 @@ window.storage = {
   async set(key, value, shared){
     const r = await fetch('/api/storage/set', {
       method: 'POST',
+      cache: 'no-store',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ key, value })
     });
@@ -459,6 +460,7 @@ window.storage = {
   async delete(key, shared){
     const r = await fetch('/api/storage/delete', {
       method: 'POST',
+      cache: 'no-store',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ key })
     });
