@@ -1,6 +1,18 @@
 import { sql, ensureTable } from '../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
+
+// Explicit no-store headers on every response — the exports above stop NEXT.JS's own internal
+// caching, but Vercel's edge network can still cache a GET response by URL at the HTTP layer
+// unless the response itself says not to. This closes that gap.
+function noCacheJson(body, init) {
+  return Response.json(body, {
+    ...init,
+    headers: { ...(init && init.headers), 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' },
+  });
+}
 
 export async function GET(request) {
   try {
@@ -10,9 +22,9 @@ export async function GET(request) {
     const { rows } = await sql`
       SELECT store_key FROM kv_store WHERE store_key LIKE ${prefix + '%'}
     `;
-    return Response.json({ keys: rows.map(r => r.store_key) });
+    return noCacheJson({ keys: rows.map(r => r.store_key) });
   } catch (e) {
     console.error('list failed', e);
-    return Response.json({ error: 'Storage list failed: ' + e.message }, { status: 500 });
+    return noCacheJson({ error: 'Storage list failed: ' + e.message }, { status: 500 });
   }
 }
