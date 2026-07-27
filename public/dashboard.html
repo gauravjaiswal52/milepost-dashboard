@@ -130,6 +130,13 @@ label{font-size:11.5px;color:var(--muted);letter-spacing:.3px;text-transform:upp
   display:flex;align-items:center;justify-content:space-between;gap:6px;transition:border-color .15s;
 }
 .msel-btn:hover{border-color:var(--amber);}
+.stage-msel-btn{
+  min-width:110px;text-align:left;background:#0e1720;border:1px solid var(--hairline);color:var(--text);
+  border-radius:7px;padding:6px 8px;font-size:12px;cursor:pointer;font-family:'IBM Plex Mono',monospace;
+  display:flex;align-items:center;justify-content:space-between;gap:6px;transition:border-color .15s;
+}
+.stage-msel-btn:hover{border-color:var(--amber);}
+.stage-cell{position:relative;}
 .msel-caret{color:var(--muted-2);font-size:10px;}
 .msel-panel{
   display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:220px;max-height:280px;overflow:auto;
@@ -474,7 +481,7 @@ window.storage = {
 <script>
 /* ============================== CONFIG / CONSTANTS ============================== */
 const STAGES = [
-  {id:'pre_correction', name:'Pre-Correction', abbr:'PC', team:'AIDataOps', duration:3},
+  {id:'pre_correction', name:'Pre-Correction', abbr:'PC', team:'CSM', duration:3},
   {id:'correction', name:'Correction', abbr:'COR', team:'AIDataOps', duration:5},
   {id:'imagery_dsm_download', name:'Imagery/DSM Download', abbr:'DL', team:'SE', duration:2},
   {id:'imagery_dsm_ingestion', name:'Imagery/DSM Ingestion', abbr:'ING', team:'SE', duration:2},
@@ -522,6 +529,13 @@ function defaultLmsMult(){
 
 const STAGE_BY_ID = Object.fromEntries(STAGES.map(s=>[s.id,s]));
 const stageIndex = id => STAGES.findIndex(s=>s.id===id);
+// A project can be marked as being at more than one stage at once (genuinely parallel work).
+// Where a single representative stage is needed (sorting, CSV, labels, forward-projection
+// anchor), we use the furthest-along one — "lead" as in leading edge of progress.
+function leadStageId(p){
+  const ids = (p.currentStageIds && p.currentStageIds.length) ? p.currentStageIds : [p.currentStageId];
+  return [...ids].sort((a,b)=>stageIndex(b)-stageIndex(a))[0];
+}
 
 const todayISO = () => new Date().toISOString().slice(0,10);
 const TODAY = todayISO();
@@ -570,11 +584,13 @@ const SHARED = true;
 
 let STATE = {
   config: {
-    stageRules: Object.fromEntries(STAGES.map(s=>[s.id, {base:s.duration, mult:{Dx:1, Tx:1.15, Both:1.3}, lmsMult:defaultLmsMult()}])),
+    stageRules: Object.fromEntries(STAGES.map(s=>[s.id, {base:s.duration, mult:{Dx:1, Tx:1.15, Both:1.3}, lmsMult:defaultLmsMult(), appliesTo:{New:true, Old: s.id!=='tg_run'}}])),
     teamMap: Object.fromEntries(STAGES.map(s=>[s.id,s.team])),
   },
   projects: [],
   blockerHistory: [], // {id, projectId, team, date}
+  delayHistory: [], // {id, projectId, stageId, team, oldEnd, newEnd, deltaDays, date} — from Live schedule edits
+  emList: [], // managed EM/PM master list, editable in Settings
 };
 let filters = { em:[], workflow:[], stage:[], track:[], blocker:[], type:[], manual:[], q:'' };
 let archiveFilters = { em:[], workflow:[], type:[], completedStatus:[], q:'' };
@@ -703,7 +719,7 @@ async function loadAllData(){
   if(rulesObj && !rulesObj.__readFailed){
     STAGES.forEach(s=>{
       const r = rulesObj[s.id];
-      if(r){ rules[s.id] = {base:r.base, mult:r.mult||{Dx:1,Tx:1.15,Both:1.3}, lmsMult:r.lmsMult||defaultLmsMult()}; teamMap[s.id] = r.team; }
+      if(r){ rules[s.id] = {base:r.base, mult:r.mult||{Dx:1,Tx:1.15,Both:1.3}, lmsMult:r.lmsMult||defaultLmsMult(), appliesTo:r.appliesTo||{New:true, Old:s.id!=='tg_run'}}; teamMap[s.id] = r.team; }
     });
   }
   const projectKeys = await listKeys('milepost:project:');
@@ -722,11 +738,25 @@ async function loadAllData(){
     if(obj.completedAt === undefined) obj.completedAt = null;
     if(!obj.blockerTeam) obj.blockerTeam = '';
     if(!obj.offTrackReason) obj.offTrackReason = '';
+    if(!obj.currentStageIds || !obj.currentStageIds.length) obj.currentStageIds = [obj.currentStageId];
+    obj.currentStageId = leadStageId(obj); // keep the derived single-stage field in sync for display code that still uses it
+    if(!obj.liveDates) obj.liveDates = JSON.parse(JSON.stringify(obj.stageDates)); // Live/Domino schedule (Point 2) — defaults to Baseline until someone records a real slip
+    if(!obj.actualDates) obj.actualDates = {}; // Actuals (Point 3) — blank until an EM populates it
+    if(!obj.revisedEdd) obj.revisedEdd = obj.edd; // EM-editable target (Point 3), defaults to the original Customer EDD
     projects.push(obj);
   });
   const historyRaw = await getJson('milepost:history');
   const history = (historyRaw && !historyRaw.__readFailed) ? historyRaw : [];
-  return { rules, teamMap, projects, history, hasRules: !!(rulesObj && !rulesObj.__readFailed), hasProjects: projectKeys.length>0, failedProjectKeys };
+  const delayHistoryRaw = await getJson('milepost:delayhistory');
+  const delayHistory = (delayHistoryRaw && !delayHistoryRaw.__readFailed) ? delayHistoryRaw : [];
+  const emListRaw = await getJson('milepost:emlist');
+  const hasEmList = !!(emListRaw && !emListRaw.__readFailed);
+  const emList = hasEmList ? emListRaw : [...new Set(projects.map(p=>p.em).filter(Boolean))].sort();
+  // Stable order regardless of what order the backend returns rows in — otherwise unrelated
+  // reloads (e.g. the periodic auto-refresh) can make the table visibly reshuffle for reasons
+  // that have nothing to do with anything the person just did.
+  projects.sort((a,b)=> a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  return { rules, teamMap, projects, history, delayHistory, emList, hasEmList, hasRules: !!(rulesObj && !rulesObj.__readFailed), hasProjects: projectKeys.length>0, failedProjectKeys };
 }
 
 // Save one project. Returns {saved:true} normally, or {saved:false, conflict:true} if
@@ -777,10 +807,15 @@ async function deleteProjectRemote(id){
 async function saveAllRules(){
   const payload = {};
   STAGES.forEach(s=>{
-    payload[s.id] = { base:STATE.config.stageRules[s.id].base, mult:STATE.config.stageRules[s.id].mult, lmsMult:STATE.config.stageRules[s.id].lmsMult, team:STATE.config.teamMap[s.id] };
+    payload[s.id] = { base:STATE.config.stageRules[s.id].base, mult:STATE.config.stageRules[s.id].mult, lmsMult:STATE.config.stageRules[s.id].lmsMult, appliesTo:STATE.config.stageRules[s.id].appliesTo, team:STATE.config.teamMap[s.id] };
   });
   try{ await withRetry(()=>window.storage.set('milepost:rules', JSON.stringify(payload), SHARED)); return true; }
   catch(e){ console.log('Save failed (handled — user notified, retry available):', e && e.message); showToast('Could not save Settings — the storage service returned an error. Please try again.', 'error', 4500); return false; }
+}
+
+async function saveEmList(){
+  try{ await withRetry(()=>window.storage.set('milepost:emlist', JSON.stringify(STATE.emList), SHARED)); return true; }
+  catch(e){ console.log('Save failed (handled — user notified, retry available):', e && e.message); showToast('Could not save the EM/PM list — the storage service returned an error. Please try again.', 'error', 4500); return false; }
 }
 
 // History is one combined key; each append re-reads the latest remote list first so a
@@ -795,6 +830,18 @@ async function addHistoryEntry(entry){
   }catch(e){
     console.log('Save failed (handled — user notified, retry available):', e && e.message);
     STATE.blockerHistory.push(entry); // keep it locally even if the write failed, so it's not silently lost on screen
+  }
+}
+
+async function addDelayEntry(entry){
+  try{
+    const remote = (await getJson('milepost:delayhistory')) || STATE.delayHistory || [];
+    const merged = [...remote, entry];
+    await withRetry(()=>window.storage.set('milepost:delayhistory', JSON.stringify(merged), SHARED));
+    STATE.delayHistory = merged;
+  }catch(e){
+    console.log('Save failed (handled — user notified, retry available):', e && e.message);
+    STATE.delayHistory.push(entry); // keep it locally even if the write failed, so it's not silently lost on screen
   }
 }
 
@@ -826,6 +873,8 @@ async function refreshAll(){
     STATE.projects = data.projects;
   }
   STATE.blockerHistory = data.history;
+  STATE.delayHistory = data.delayHistory;
+  if(data.hasEmList) STATE.emList = data.emList;
   lastRefreshedAt = new Date();
   updateRefreshLabel();
   if(activeTab==='tracker') renderTracker();
@@ -859,8 +908,8 @@ function seed(){
     const edd = addBusinessDays(TODAY, statusOffsetDays + daysAfterCurrent);
     const p = {
       id: uid('p'), name, em, workflow: wf, projectType: type, lms,
-      edd, currentStageId: STAGES[currentStageIdx].id,
-      stageDates: {}, parallel: {}, manualStatus: overrides.manualStatus || '',
+      edd, revisedEdd: edd, currentStageId: STAGES[currentStageIdx].id, currentStageIds: [STAGES[currentStageIdx].id],
+      stageDates: {}, liveDates: {}, actualDates: {}, parallel: {}, manualStatus: overrides.manualStatus || '',
       progressStatus: overrides.progressStatus || 'In Progress',
       completedOnTrack: overrides.completedOnTrack ?? null,
       completedAt: overrides.completedAt || null,
@@ -904,44 +953,91 @@ function getStageDuration(stageId, project){
 // parallel flags or manual overrides. Purely a planning sanity-check number: "if I set the EDD
 // less than this many days out, the back-calculated schedule will already be in the past."
 function getStandardCycleLength(project){
-  return STAGES.reduce((sum,s)=>sum+getStageDuration(s.id, project), 0);
+  return STAGES.reduce((sum,s)=> sum + (stageApplies(s.id, project.workflow) ? getStageDuration(s.id, project) : 0), 0);
 }
 
 // Back-calculate stage start/end dates from EDD (last stage end = EDD), walking backwards.
 // If project.parallel[stageId] is true, that stage runs alongside the following stage (same start/end window).
+// Whether a stage is even part of the pipeline for this project's workflow — e.g. TG Run is
+// New-workflow only by default (configurable per stage in Settings). A non-applicable stage
+// doesn't consume its own time slot; it just mirrors whatever comes right after it.
+function stageApplies(stageId, workflow){
+  const rule = STATE.config.stageRules[stageId];
+  if(!rule || !rule.appliesTo) return true;
+  return rule.appliesTo[workflow] !== false;
+}
+
+// BASELINE schedule (Point 1): purely computed from Customer EDD + Settings durations, every
+// time it's called. Not user-editable anywhere in the UI — this is what System Status is
+// measured against, and it's meant to represent "what the plan says," untouched by hand edits.
 function computeStageDates(project){
   let cursorEnd = project.edd;
   const dates = {};
   for(let i = STAGES.length-1; i>=0; i--){
     const s = STAGES[i];
-    const approved = (project.stageDates[s.id] && project.stageDates[s.id].approved) ? project.stageDates[s.id] : null;
-    if(project.parallel[s.id] && i < STAGES.length-1){
-      // mirror the following stage's window (runs in parallel with it)
+    const notApplicable = !stageApplies(s.id, project.workflow);
+    if((project.parallel[s.id] || notApplicable) && i < STAGES.length-1){
+      // mirror the following stage's window (runs in parallel with it, or doesn't apply at all)
       const next = dates[STAGES[i+1].id];
-      dates[s.id] = approved || { start: next.start, end: next.end, approved:false };
+      dates[s.id] = { start: next.start, end: next.end, notApplicable };
       continue;
     }
     const end = cursorEnd;
     const start = addBusinessDays(end, -(getStageDuration(s.id, project)-1));
-    dates[s.id] = approved || { start, end, approved:false };
+    dates[s.id] = { start, end };
     cursorEnd = addBusinessDays(dates[s.id].start, -1);
   }
-  // preserve any pending (unapproved) edit overlays
-  Object.keys(project.stageDates).forEach(k=>{
-    if(project.stageDates[k] && project.stageDates[k].pending){
-      dates[k].pending = project.stageDates[k].pending;
-    }
-  });
   project.stageDates = dates;
+  // The Live/Domino schedule (Point 2) always starts as a fresh copy of Baseline whenever
+  // Baseline itself is recalculated (EDD/LMs/Type/Settings change) — if the underlying plan
+  // changed, prior manual "this stage actually slipped" adjustments are stale and should be
+  // re-entered against the new plan rather than silently kept.
+  project.liveDates = JSON.parse(JSON.stringify(dates));
 }
 
-// On-track check: is the CURRENT stage still within its own planned end date?
-// Earlier stages are expected to already be in the past once a project has moved on —
-// that's normal progression, not evidence of delay — so only the active stage is checked.
+// LIVE/DOMINO schedule edit (Point 2): user records that a specific stage's actual dates
+// differ from plan. That stage's window is set exactly as given, then every stage AFTER it
+// (in pipeline order) is pushed forward from there using its own Settings duration — a true
+// domino effect. Stages before the edited one are untouched. Returns the delay-log entry so
+// the caller can persist it.
+function applyLiveEdit(project, stageId, newStart, newEnd){
+  const dates = project.liveDates;
+  const oldEntry = dates[stageId] || {start:newStart, end:newEnd};
+  const oldEnd = oldEntry.end;
+  dates[stageId] = { start:newStart, end:newEnd };
+  const startIdx = stageIndex(stageId);
+  let cursorEnd = newEnd;
+  for(let i=startIdx+1; i<STAGES.length; i++){
+    const s = STAGES[i];
+    if(project.parallel[s.id] || !stageApplies(s.id, project.workflow)){
+      dates[s.id] = { start: cursorEnd, end: cursorEnd, notApplicable: !stageApplies(s.id, project.workflow) };
+      continue;
+    }
+    const d = getStageDuration(s.id, project);
+    const start = addBusinessDays(cursorEnd, 1);
+    const end = addBusinessDays(start, d-1);
+    dates[s.id] = { start, end };
+    cursorEnd = end;
+  }
+  const deltaDays = businessDaysBetween(oldEnd, newEnd);
+  return {
+    id: uid('dl'), projectId: project.id, projectName: project.name,
+    stageId, stageName: STAGE_BY_ID[stageId].name, team: STATE.config.teamMap[stageId],
+    oldEnd, newEnd, deltaDays, date: TODAY
+  };
+}
+
+// On-track check: is EVERY currently-active stage still within its own planned end date?
+// A project marked as being at multiple parallel stages is off-track if any one of them has
+// slipped — one late stage still holds up the whole project. Earlier (non-current) stages are
+// expected to already be in the past once a project has moved on — that's normal progression,
+// not evidence of delay — so only the active stage(s) are checked.
 function computeOnTrack(project){
-  const curDates = project.stageDates[project.currentStageId];
-  if(!curDates) return true;
-  return TODAY <= curDates.end;
+  const ids = (project.currentStageIds && project.currentStageIds.length) ? project.currentStageIds : [project.currentStageId];
+  return ids.every(sid=>{
+    const d = project.stageDates[sid];
+    return !d || TODAY <= d.end;
+  });
 }
 
 // Estimated Project EDD: cascades forward from wherever the project actually stands today.
@@ -950,20 +1046,16 @@ function computeOnTrack(project){
 // itself flexes with LMs and Dx/Tx/Both). If nothing is late, this collapses back to the
 // original Project EDD. Stages already completed are not re-litigated — this is a forward
 // projection from the present, not a re-write of history.
+// Estimated Project EDD (Point 2): the Live/Domino schedule's own last-stage end date. If no
+// one has recorded any stage as actually running early/late, Live still equals Baseline, so
+// this exactly equals the original Customer EDD — drift only appears once someone explicitly
+// records a stage's real dates via applyLiveEdit, which is a deliberate design choice: this is
+// "what we've told the system actually happened," not an automatic guess based on today's date.
 function computeEstimatedEdd(project){
-  const curIdx = stageIndex(project.currentStageId);
-  const curDates = project.stageDates[project.currentStageId];
-  if(!curDates) return project.edd;
-  let cursorEnd = curDates.end < TODAY ? TODAY : curDates.end;
-  for(let i=curIdx+1; i<STAGES.length; i++){
-    const s = STAGES[i];
-    if(project.parallel[s.id]){
-      continue; // runs alongside a neighboring stage — doesn't add sequential time
-    }
-    const d = getStageDuration(s.id, project);
-    cursorEnd = addBusinessDays(cursorEnd, d);
-  }
-  return cursorEnd;
+  const live = project.liveDates || project.stageDates;
+  const lastStage = STAGES[STAGES.length-1];
+  const entry = live[lastStage.id];
+  return entry ? entry.end : project.edd;
 }
 
 async function bulkDeleteSelected(){
@@ -997,7 +1089,7 @@ function filteredProjects(){
   return activeProjects().filter(p=>{
     if(filters.em.length && !filters.em.includes(p.em)) return false;
     if(filters.workflow.length && !filters.workflow.includes(p.workflow)) return false;
-    if(filters.stage.length && !filters.stage.includes(p.currentStageId)) return false;
+    if(filters.stage.length && !p.currentStageIds.some(id=>filters.stage.includes(id))) return false;
     if(filters.track.length){
       const on = computeOnTrack(p) ? 'on' : 'off';
       if(!filters.track.includes(on)) return false;
@@ -1148,11 +1240,7 @@ function renderTracker(){
   list.forEach(p=>{
     document.getElementById('editStage_'+p.id).onclick = ()=>openStageEditModal(p.id);
     document.getElementById('editMeta_'+p.id).onclick = ()=>openProjectModal(p.id);
-    document.getElementById('stageSel_'+p.id).onchange = async e=>{
-      p.currentStageId = e.target.value;
-      await saveProject(p);
-      renderTracker();
-    };
+    wireStageCell(p);
     document.getElementById('manualSel_'+p.id).onchange = async e=>{
       p.manualStatus = e.target.value;
       await saveProject(p);
@@ -1198,9 +1286,7 @@ function renderProjectRow(p, sNo){
         ${slipDays>0 ? `<div class="slip-tag">+${slipDays}d</div>` : (slipDays<0?`<div class="slip-tag early">${slipDays}d</div>`:'')}
       </td>
       <td>
-        <select id="stageSel_${p.id}" style="font-size:12px;padding:6px 8px;">
-          ${STAGES.map(s=>`<option value="${s.id}" ${p.currentStageId===s.id?'selected':''}>${s.name}</option>`).join('')}
-        </select>
+        ${renderStageCell(p)}
       </td>
       <td>${renderRail(p)}</td>
       <td>
@@ -1232,18 +1318,66 @@ function renderProjectRow(p, sNo){
 }
 
 function renderRail(p){
-  const curIdx = stageIndex(p.currentStageId);
-  const onTrack = computeOnTrack(p);
+  const currentIndices = p.currentStageIds.map(id=>stageIndex(id));
+  const minCur = Math.min(...currentIndices);
   return `<div class="rail">${STAGES.map((s,i)=>{
     const d = p.stageDates[s.id];
+    const isCurrent = currentIndices.includes(i);
     let cls = 'tie';
-    if(i < curIdx) cls += ' done';
-    else if(i === curIdx) cls += ' current ' + (onTrack?'on':'off');
-    const pendingNote = d && d.pending ? ' · pending approval' : '';
+    if(i < minCur) cls += ' done';
+    else if(isCurrent){
+      const stageOnTrack = !d || TODAY <= d.end;
+      cls += ' current ' + (stageOnTrack?'on':'off');
+    }
+    const liveD = p.liveDates && p.liveDates[s.id];
+    const adjustedNote = (liveD && d && (liveD.start!==d.start || liveD.end!==d.end)) ? ' · adjusted in Live schedule' : '';
+    const naNote = d && d.notApplicable ? ' · not used for this workflow' : '';
     return `<div class="${cls}">
-      <div class="tip"><div class="tname">${s.abbr} — ${s.name}${p.parallel[s.id]?' (parallel)':''}</div><div class="trange">${d?fmtDate(d.start):'—'} → ${d?fmtDate(d.end):'—'}${pendingNote}</div></div>
+      <div class="tip"><div class="tname">${s.abbr} — ${s.name}${p.parallel[s.id]?' (parallel)':''}</div><div class="trange">${d?fmtDate(d.start):'—'} → ${d?fmtDate(d.end):'—'}${adjustedNote}${naNote}</div></div>
     </div>`;
   }).join('')}</div>`;
+}
+
+// Multi-select "Current Stage" cell — a project can genuinely be at more than one stage at
+// once (real parallel work), so this is a checkbox dropdown rather than a single <select>.
+function renderStageCell(p){
+  const selected = p.currentStageIds;
+  const label = selected.map(id=>STAGE_BY_ID[id].abbr).join(', ');
+  return `
+    <div class="msel stage-cell">
+      <button type="button" class="stage-msel-btn" data-stagecell="${p.id}">${label}<span class="msel-caret">▾</span></button>
+      <div class="msel-panel ${openMultiselect==='stage_'+p.id?'open':''}" data-stagecell-panel="${p.id}">
+        ${STAGES.map(s=>{
+          const checked = selected.includes(s.id);
+          return `<label class="msel-opt"><input type="checkbox" data-stagecell-opt="${p.id}" value="${s.id}" ${checked?'checked':''}> ${s.name}</label>`;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+function wireStageCell(p){
+  const btn = document.querySelector(`[data-stagecell="${p.id}"]`);
+  if(btn) btn.onclick = (e)=>{
+    e.stopPropagation();
+    const key = 'stage_'+p.id;
+    openMultiselect = (openMultiselect===key) ? null : key;
+    renderTracker();
+  };
+  document.querySelectorAll(`[data-stagecell-opt="${p.id}"]`).forEach(cb=>{
+    cb.onclick = e=>e.stopPropagation();
+    cb.onchange = async ()=>{
+      const val = cb.value;
+      let ids = [...p.currentStageIds];
+      if(cb.checked){ if(!ids.includes(val)) ids.push(val); }
+      else { ids = ids.filter(v=>v!==val); }
+      if(ids.length===0) ids = [val]; // never allow zero stages selected — revert the uncheck
+      p.currentStageIds = ids;
+      p.currentStageId = leadStageId(p);
+      openMultiselect = 'stage_'+p.id;
+      await saveProject(p);
+      renderTracker();
+    };
+  });
 }
 
 /* ---------- Blocker reason modal ---------- */
@@ -1297,7 +1431,7 @@ function openBlockerModal(projectId){
 function openProjectModal(projectId){
   const editing = !!projectId;
   const p = editing ? STATE.projects.find(x=>x.id===projectId) : null;
-  const ems = [...new Set(STATE.projects.map(x=>x.em))].sort();
+  const emOptions = [...new Set([...STATE.emList, ...(editing && p.em ? [p.em] : [])])];
   const body = document.getElementById('modalBody');
   body.innerHTML = `
     <button class="modal-close" id="mClose">✕</button>
@@ -1305,7 +1439,12 @@ function openProjectModal(projectId){
     <p class="modal-sub">${editing?'Update project-level details.':'Add a project to the tracker.'}</p>
     <div class="field"><label>Project name</label><input type="text" id="mName" value="${editing?escapeHtml(p.name):''}"></div>
     <div class="field-row">
-      <div class="field"><label>EM / PM name</label><input type="text" id="mEm" list="emList" value="${editing?escapeHtml(p.em):''}"><datalist id="emList">${ems.map(e=>`<option value="${escapeHtml(e)}">`).join('')}</datalist></div>
+      <div class="field"><label>EM / PM name</label>
+        <select id="mEm">
+          ${emOptions.length===0?`<option value="">No names yet — add one in Settings</option>`:''}
+          ${emOptions.map(e=>`<option value="${escapeHtml(e)}" ${editing&&p.em===e?'selected':''}>${escapeHtml(e)}</option>`).join('')}
+        </select>
+      </div>
       <div class="field"><label>Workflow</label><select id="mWf">${WORKFLOWS.map(w=>`<option ${editing&&p.workflow===w?'selected':''}>${w}</option>`).join('')}</select></div>
     </div>
     <div class="field-row">
@@ -1317,7 +1456,14 @@ function openProjectModal(projectId){
       <div class="field">${editing?`<label>Estimated EDD <span style="text-transform:none;font-weight:400">(computed)</span></label><input type="text" disabled value="${fmtDate(computeEstimatedEdd(p))}" style="opacity:.7">`:''}</div>
     </div>
     <p class="modal-sub" id="spanHint" style="margin-top:-6px"></p>
-    <div class="field"><label>Current stage</label><select id="mStage">${STAGES.map(s=>`<option value="${s.id}" ${editing&&p.currentStageId===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div>
+    <div class="field"><label>Current stage(s) <span style="text-transform:none;font-weight:400">(check more than one if running in parallel)</span></label>
+      <div class="msel-panel" style="position:static;display:block;max-height:200px">
+        ${STAGES.map(s=>{
+          const checked = editing ? p.currentStageIds.includes(s.id) : s.id===STAGES[0].id;
+          return `<label class="msel-opt"><input type="checkbox" class="mStageCb" value="${s.id}" ${checked?'checked':''}> ${s.name}</label>`;
+        }).join('')}
+      </div>
+    </div>
     <div class="field"><label>EM Status <span style="text-transform:none;font-weight:400">(self-reported by EM/PM)</span></label>
       <select id="mManualStatus">
         <option value="" ${editing&&!p.manualStatus?'selected':''}>Not set</option>
@@ -1370,7 +1516,9 @@ function openProjectModal(projectId){
     const projectType = document.getElementById('mType').value;
     const lms = parseFloat(document.getElementById('mLms').value)||0;
     const edd = document.getElementById('mEdd').value || TODAY;
-    const currentStageId = document.getElementById('mStage').value;
+    let currentStageIds = Array.from(document.querySelectorAll('.mStageCb:checked')).map(cb=>cb.value);
+    if(currentStageIds.length===0) currentStageIds = [STAGES[0].id];
+    const currentStageId = leadStageId({currentStageIds});
     const manualStatus = document.getElementById('mManualStatus').value;
     const newProgress = document.getElementById('mProgress').value;
     let target;
@@ -1383,11 +1531,11 @@ function openProjectModal(projectId){
         p.completedOnTrack = null;
         p.completedAt = null;
       }
-      Object.assign(p, {name, em, workflow, projectType, lms, edd, currentStageId, manualStatus, progressStatus:newProgress});
+      Object.assign(p, {name, em, workflow, projectType, lms, edd, currentStageId, currentStageIds, manualStatus, progressStatus:newProgress});
       if(recalcNeeded){ p.stageDates = {}; computeStageDates(p); }
       target = p;
     } else {
-      const np = {id:uid('p'), name, em, workflow, projectType, lms, edd, currentStageId, stageDates:{}, parallel:{}, manualStatus, progressStatus:newProgress, completedOnTrack:null, completedAt:null, offTrackReason:'', blockerTeam:''};
+      const np = {id:uid('p'), name, em, workflow, projectType, lms, edd, revisedEdd:edd, currentStageId, currentStageIds, stageDates:{}, liveDates:{}, actualDates:{}, parallel:{}, manualStatus, progressStatus:newProgress, completedOnTrack:null, completedAt:null, offTrackReason:'', blockerTeam:''};
       computeStageDates(np);
       if(newProgress==='Completed'){ np.completedOnTrack = computeOnTrack(np); np.completedAt = TODAY; }
       STATE.projects.push(np);
@@ -1403,51 +1551,139 @@ function openProjectModal(projectId){
 /* ---------- Stage date edit modal (requires approval) ---------- */
 function openStageEditModal(projectId){
   const p = STATE.projects.find(x=>x.id===projectId);
-  const body = document.getElementById('modalBody');
-  body.innerHTML = `
-    <button class="modal-close" id="mClose">✕</button>
-    <h2>Stage schedule</h2>
-    <p class="modal-sub">${escapeHtml(p.name)} · back-calculated from EDD ${fmtDate(p.edd)} using business days (weekends skipped). Edits here apply immediately.</p>
-    <div id="stageRows">
-      ${STAGES.map(s=>{
-        const d = p.stageDates[s.id];
-        return `<div class="stage-edit-row">
-          <div class="sname">${s.name}<span class="team">${STATE.config.teamMap[s.id]}</span></div>
-          <div><input type="date" class="sdStart" data-stage="${s.id}" value="${d.start}"></div>
-          <div><input type="date" class="sdEnd" data-stage="${s.id}" value="${d.end}"></div>
-          <label class="parallel-toggle"><input type="checkbox" class="sdPar" data-stage="${s.id}" ${p.parallel[s.id]?'checked':''} ${stageIndex(s.id)===0?'disabled':''}> parallel</label>
-        </div>`;
-      }).join('')}
-    </div>
-    <p class="modal-sub" style="margin-top:10px">Check "parallel" to have a stage run alongside the stage before it instead of sequentially after it.</p>
-    <div class="modal-foot">
-      <button class="btn ghost" id="mCancel">Cancel</button>
-      <button class="btn primary" id="mSubmit">Save changes</button>
-    </div>
-  `;
-  document.getElementById('mClose').onclick = closeModal;
-  document.getElementById('mCancel').onclick = closeModal;
-  document.getElementById('mSubmit').onclick = async ()=>{
-    STAGES.forEach(s=>{
-      const startInput = document.querySelector(`.sdStart[data-stage="${s.id}"]`).value;
-      const endInput = document.querySelector(`.sdEnd[data-stage="${s.id}"]`).value;
-      const parInput = document.querySelector(`.sdPar[data-stage="${s.id}"]`).checked;
-      const cur = p.stageDates[s.id];
-      p.parallel[s.id] = parInput;
-      if(startInput!==cur.start || endInput!==cur.end){
-        p.stageDates[s.id] = {start:startInput, end:endInput, approved:true};
-      }
+  let tab = 'baseline'; // baseline | live | actuals
+
+  function renderBody(){
+    const body = document.getElementById('modalBody');
+    const estEdd = computeEstimatedEdd(p);
+    const estDelta = businessDaysBetween(p.edd, estEdd);
+    const revDelta = businessDaysBetween(p.edd, p.revisedEdd || p.edd);
+    body.innerHTML = `
+      <button class="modal-close" id="mClose">✕</button>
+      <h2>Stage schedule</h2>
+      <p class="modal-sub">${escapeHtml(p.name)} · Customer EDD ${fmtDate(p.edd)} · business days (weekends skipped)</p>
+      <div class="nav" style="display:inline-flex;margin:12px 0 16px;padding:3px">
+        <button type="button" class="schedTabBtn" data-schedtab="baseline" style="${tab==='baseline'?'background:var(--hairline-soft);color:var(--amber)':''}">Baseline (fixed)</button>
+        <button type="button" class="schedTabBtn" data-schedtab="live" style="${tab==='live'?'background:var(--hairline-soft);color:var(--amber)':''}">Live / Est. EDD</button>
+        <button type="button" class="schedTabBtn" data-schedtab="actuals" style="${tab==='actuals'?'background:var(--hairline-soft);color:var(--amber)':''}">Actuals</button>
+      </div>
+      ${tab==='baseline' ? `
+        <p class="modal-sub">Auto-computed from Customer EDD and Settings durations. Not editable here — this is what System Status is measured against. The only thing you can change is whether a stage runs in parallel with the one before it.</p>
+        <div id="stageRows">
+          ${STAGES.map(s=>{
+            const d = p.stageDates[s.id];
+            return `<div class="stage-edit-row">
+              <div class="sname">${s.name}<span class="team">${STATE.config.teamMap[s.id]}</span></div>
+              <div class="mono" style="font-size:12.5px">${fmtDate(d.start)}</div>
+              <div class="mono" style="font-size:12.5px">${fmtDate(d.end)}</div>
+              <label class="parallel-toggle"><input type="checkbox" class="sdPar" data-stage="${s.id}" ${p.parallel[s.id]?'checked':''} ${stageIndex(s.id)===0?'disabled':''}> parallel</label>
+            </div>`;
+          }).join('')}
+        </div>
+        <p class="modal-sub" style="margin-top:10px">Check "parallel" to have a stage run alongside the stage before it instead of sequentially after it — applies immediately.</p>
+      ` : ''}
+      ${tab==='live' ? `
+        <div class="pending-note" style="margin-bottom:14px">Estimated Project EDD: <b>${fmtDate(estEdd)}</b> — ${estDelta===0?'exactly on the original Customer EDD':(estDelta>0?`${estDelta} business day(s) later than Customer EDD`:`${-estDelta} business day(s) earlier than Customer EDD`)}</div>
+        <p class="modal-sub">Edit a stage's actual start/end below and click Apply on that row — every later stage cascades forward automatically from it. This is what drives Estimated Project EDD, and each change is logged (visible in Summary).</p>
+        <div id="stageRows">
+          ${STAGES.map(s=>{
+            const d = p.liveDates[s.id] || p.stageDates[s.id];
+            return `<div class="stage-edit-row" style="grid-template-columns:1.3fr 1fr 1fr auto">
+              <div class="sname">${s.name}<span class="team">${STATE.config.teamMap[s.id]}</span></div>
+              <div><input type="date" class="liveStart" data-stage="${s.id}" value="${d.start}"></div>
+              <div><input type="date" class="liveEnd" data-stage="${s.id}" value="${d.end}"></div>
+              <button type="button" class="btn small ghost" data-liveapply="${s.id}">Apply</button>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+      ${tab==='actuals' ? `
+        <div class="field">
+          <label>Revised Customer EDD <span style="text-transform:none;font-weight:400">(original: ${fmtDate(p.edd)})</span></label>
+          <input type="date" id="revisedEddInput" value="${p.revisedEdd || p.edd}">
+          <p class="modal-sub" style="margin-top:6px">${revDelta===0?'Same as the original Customer EDD.':(revDelta>0?`${revDelta} business day(s) later than the original Customer EDD.`:`${-revDelta} business day(s) earlier than the original Customer EDD.`)}</p>
+        </div>
+        <p class="modal-sub">Enter what actually happened, stage by stage. Purely informational — doesn't cascade or affect System Status or Estimated EDD.</p>
+        <div id="stageRows">
+          ${STAGES.map(s=>{
+            const d = p.actualDates[s.id] || {start:'', end:''};
+            return `<div class="stage-edit-row">
+              <div class="sname">${s.name}<span class="team">${STATE.config.teamMap[s.id]}</span></div>
+              <div><input type="date" class="actualStart" data-stage="${s.id}" value="${d.start||''}"></div>
+              <div><input type="date" class="actualEnd" data-stage="${s.id}" value="${d.end||''}"></div>
+              <div></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="mCancel">Cancel</button>
+          <button class="btn primary" id="mSaveActuals">Save Actuals</button>
+        </div>
+      ` : ''}
+      ${tab!=='actuals' ? `
+        <div class="modal-foot">
+          <button class="btn ghost" id="mCancel">Close</button>
+        </div>
+      ` : ''}
+    `;
+    document.getElementById('mClose').onclick = closeModal;
+    document.getElementById('mCancel').onclick = closeModal;
+    document.querySelectorAll('.schedTabBtn').forEach(btn=>{
+      btn.onclick = ()=>{ tab = btn.dataset.schedtab; renderBody(); };
     });
-    computeStageDates(p);
-    const result = await saveProject(p);
-    closeModal();
-    renderTracker();
-  };
+
+    if(tab==='baseline'){
+      document.querySelectorAll('.sdPar').forEach(cb=>{
+        cb.onchange = async ()=>{
+          p.parallel[cb.dataset.stage] = cb.checked;
+          computeStageDates(p); // also resets Live to match the new Baseline
+          await saveProject(p);
+          renderBody();
+        };
+      });
+    }
+
+    if(tab==='live'){
+      document.querySelectorAll('[data-liveapply]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          const sid = btn.dataset.liveapply;
+          const newStart = document.querySelector(`.liveStart[data-stage="${sid}"]`).value;
+          const newEnd = document.querySelector(`.liveEnd[data-stage="${sid}"]`).value;
+          const cur = p.liveDates[sid] || p.stageDates[sid];
+          if(newStart===cur.start && newEnd===cur.end){ showToast('No change to apply for that stage.', 'error'); return; }
+          const delayEntry = applyLiveEdit(p, sid, newStart, newEnd);
+          await addDelayEntry(delayEntry);
+          await saveProject(p);
+          showToast(`${STAGE_BY_ID[sid].name} updated — later stages recalculated.`, 'success');
+          renderBody();
+          renderTracker();
+        };
+      });
+    }
+
+    if(tab==='actuals'){
+      document.getElementById('mSaveActuals').onclick = async ()=>{
+        STAGES.forEach(s=>{
+          const start = document.querySelector(`.actualStart[data-stage="${s.id}"]`).value;
+          const end = document.querySelector(`.actualEnd[data-stage="${s.id}"]`).value;
+          if(start || end) p.actualDates[s.id] = {start, end};
+          else delete p.actualDates[s.id];
+        });
+        p.revisedEdd = document.getElementById('revisedEddInput').value || p.edd;
+        await saveProject(p);
+        showToast('Actuals saved.', 'success');
+        renderTracker();
+        closeModal();
+      };
+    }
+  }
+
+  renderBody();
   showModal();
 }
 
 /* ============================== CSV IMPORT / EXPORT ============================== */
-const CSV_BASE_COLUMNS = ['Project Name','EM/PM Name','Workflow (New/Old)','Type (Dx/Tx/Both)','LMs','Project EDD (YYYY-MM-DD)','Current Stage','EM Status (On-track/Off-track/blank)','Progress Status (In Progress/Completed)','Completed On-Track (Yes/No/blank)','Blocker Team (optional)','Off-Track Reason (optional)'];
+const CSV_BASE_COLUMNS = ['Project Name','EM/PM Name','Workflow (New/Old)','Type (Dx/Tx/Both)','LMs','Project EDD (YYYY-MM-DD)','Current Stage(s) — separate multiple with ;','EM Status (On-track/Off-track/blank)','Progress Status (In Progress/Completed)','Completed On-Track (Yes/No/blank)','Blocker Team (optional)','Off-Track Reason (optional)'];
 const CSV_STAGE_COLUMNS = STAGES.flatMap(s=>[`${s.name} Start`, `${s.name} End`]);
 const CSV_COLUMNS = [...CSV_BASE_COLUMNS, ...CSV_STAGE_COLUMNS];
 const CSV_BASE_COUNT = CSV_BASE_COLUMNS.length;
@@ -1469,7 +1705,7 @@ function downloadCsvTemplate(){
 
 function exportCsv(){
   const rows = STATE.projects.map(p=>{
-    const base = [p.name, p.em, p.workflow, p.projectType, p.lms, p.edd, STAGE_BY_ID[p.currentStageId].name, p.manualStatus||'', p.progressStatus||'In Progress', p.progressStatus==='Completed'?(p.completedOnTrack?'Yes':'No'):'', p.blockerTeam||'', p.offTrackReason||''];
+    const base = [p.name, p.em, p.workflow, p.projectType, p.lms, p.edd, p.currentStageIds.map(id=>STAGE_BY_ID[id].name).join('; '), p.manualStatus||'', p.progressStatus||'In Progress', p.progressStatus==='Completed'?(p.completedOnTrack?'Yes':'No'):'', p.blockerTeam||'', p.offTrackReason||''];
     const stageDates = STAGES.flatMap(s=>{
       const d = p.stageDates[s.id];
       return [d?d.start:'', d?d.end:''];
@@ -1562,8 +1798,11 @@ function parseCsvRow(r, i){
   if(lms!=='' && isNaN(lmsNum)) errors.push(`LMs "${lms}" is not a number`);
   const eddNorm = normalizeDate(edd);
   if(edd && !eddNorm) errors.push(`EDD "${edd}" is not a recognizable date`);
-  const stage = findStageByLabel(stageLabel);
-  if(stageLabel && !stage) errors.push(`Stage "${stageLabel}" doesn't match a known stage`);
+  const stageLabels = stageLabel.split(';').map(s=>s.trim()).filter(Boolean);
+  const resolvedStages = stageLabels.map(lbl=>findStageByLabel(lbl));
+  const unknownStageLabels = stageLabels.filter((lbl,idx)=>!resolvedStages[idx]);
+  if(unknownStageLabels.length) errors.push(`Stage(s) "${unknownStageLabels.join('; ')}" don't match a known stage`);
+  const currentStageIds = resolvedStages.filter(Boolean).map(s=>s.id);
   const manualStatus = MANUAL_STATUS_OPTIONS.find(o=>o.toLowerCase()===manualStatusRaw.toLowerCase()) || null;
   if(manualStatusRaw && !manualStatus) errors.push(`EM Status "${manualStatusRaw}" should be On-track, Off-track, or blank`);
   const progressStatus = PROGRESS_STATUSES.find(o=>o.toLowerCase()===progressRaw.toLowerCase()) || null;
@@ -1591,7 +1830,7 @@ function parseCsvRow(r, i){
   return {
     row: i+1, raw: r, errors,
     name, em, workflow: wf || 'New', projectType: pt || 'Dx', lms: isNaN(lmsNum)?0:lmsNum,
-    edd: eddNorm || addDays(TODAY,30), currentStageId: stage ? stage.id : STAGES[0].id,
+    edd: eddNorm || addDays(TODAY,30), currentStageIds: currentStageIds.length ? currentStageIds : [STAGES[0].id],
     manualStatus: manualStatus || '', progressStatus: progressStatus || 'In Progress', completedOnTrack,
     blockerTeam: team, offTrackReason: reason, stageEdits
   };
@@ -1621,7 +1860,7 @@ function openCsvPreviewModal(parsed){
               <td>${p.projectType}</td>
               <td class="mono">${p.lms}</td>
               <td class="mono">${fmtDate(p.edd)}</td>
-              <td>${STAGE_BY_ID[p.currentStageId].name}</td>
+              <td>${p.currentStageIds.map(id=>STAGE_BY_ID[id].name).join('; ')}</td>
               <td>${willUpdate?`<span class="wf-pill" style="color:var(--teal);border-color:var(--teal)">Update</span>`:`<span class="wf-pill" style="color:var(--green);border-color:var(--green)">New</span>`}</td>
               <td class="mono">${editCount>0?editCount+' stage(s)':'—'}</td>
               <td style="color:var(--red);font-size:11.5px">${p.errors.join('; ')}</td>
@@ -1652,7 +1891,7 @@ function openCsvPreviewModal(parsed){
       if(project){
         if(!updateExisting){ skipped++; continue; }
         const recalcNeeded = project.edd!==p.edd || project.lms!==p.lms || project.projectType!==p.projectType;
-        Object.assign(project, {em:p.em, workflow:p.workflow, projectType:p.projectType, lms:p.lms, edd:p.edd, currentStageId:p.currentStageId});
+        Object.assign(project, {em:p.em, workflow:p.workflow, projectType:p.projectType, lms:p.lms, edd:p.edd, currentStageIds:p.currentStageIds, currentStageId:leadStageId(p)});
         if(p.manualStatus) project.manualStatus = p.manualStatus;
         project.progressStatus = p.progressStatus;
         project.completedOnTrack = p.progressStatus==='Completed' ? (p.completedOnTrack!==null ? p.completedOnTrack : (project.completedOnTrack ?? computeOnTrack(project))) : null;
@@ -1663,8 +1902,8 @@ function openCsvPreviewModal(parsed){
         updated++;
       } else {
         project = {
-          id: uid('p'), name:p.name, em:p.em, workflow:p.workflow, projectType:p.projectType, lms:p.lms, edd:p.edd,
-          currentStageId:p.currentStageId, stageDates:{}, parallel:{}, manualStatus:p.manualStatus||'',
+          id: uid('p'), name:p.name, em:p.em, workflow:p.workflow, projectType:p.projectType, lms:p.lms, edd:p.edd, revisedEdd:p.edd,
+          currentStageIds:p.currentStageIds, currentStageId:leadStageId(p), stageDates:{}, liveDates:{}, actualDates:{}, parallel:{}, manualStatus:p.manualStatus||'',
           progressStatus:p.progressStatus, completedOnTrack:null, completedAt:null,
           offTrackReason:p.offTrackReason||'', blockerTeam:p.blockerTeam||''
         };
@@ -1833,6 +2072,17 @@ function renderSummary(){
   const histCounts = {};
   STATE.blockerHistory.forEach(h=>{ histCounts[h.team]=(histCounts[h.team]||0)+1; });
   const maxHist = Math.max(1, ...Object.values(histCounts));
+
+  // Live/Domino schedule change log (Point 2's audit trail)
+  const delayEvents = STATE.delayHistory;
+  const totalDelayDays = delayEvents.filter(e=>e.deltaDays>0).reduce((a,e)=>a+e.deltaDays,0);
+  const totalEarlyDays = delayEvents.filter(e=>e.deltaDays<0).reduce((a,e)=>a-e.deltaDays,0);
+  const delayByStage = {};
+  delayEvents.forEach(e=>{ delayByStage[e.stageName] = (delayByStage[e.stageName]||0) + Math.max(0,e.deltaDays); });
+  const delayByTeam = {};
+  delayEvents.forEach(e=>{ delayByTeam[e.team] = (delayByTeam[e.team]||0) + Math.max(0,e.deltaDays); });
+  const maxDelayByStage = Math.max(1, ...Object.values(delayByStage));
+  const recentDelays = [...delayEvents].sort((a,b)=> b.date.localeCompare(a.date)).slice(0,10);
 
   const stageColor = i => `hsl(${38 - i*3.4}, ${70-i}%, ${50+i*0.6}%)`;
 
@@ -2041,6 +2291,49 @@ function renderSummary(){
         `).join('')}
       </div>
     </div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="section-title">Schedule Change Log <span class="tag">Live/Domino edits — Point 2 audit trail</span></div>
+      <p style="color:var(--muted);font-size:12.5px;margin:-6px 0 16px">Every time someone records a stage's real dates in the Live schedule tab, it's logged here — this is where delays (or recoveries) actually get introduced into a project's Estimated EDD.</p>
+      <div class="kpi-row" style="margin-bottom:${delayEvents.length?'16px':'0'}">
+        <div class="kpi"><div class="val mono">${delayEvents.length}</div><div class="lbl">Total edits logged</div></div>
+        <div class="kpi red"><div class="val mono">${totalDelayDays}</div><div class="lbl">Total delay-days added</div></div>
+        <div class="kpi green"><div class="val mono">${totalEarlyDays}</div><div class="lbl">Total early-days gained</div></div>
+      </div>
+      ${delayEvents.length ? `
+      <div class="grid-2">
+        <div>
+          <div class="rule-row-label" style="margin-bottom:8px">Delay-days by stage</div>
+          ${Object.entries(delayByStage).sort((a,b)=>b[1]-a[1]).map(([stageName,days])=>`
+            <div class="team-block-card">
+              <div class="head"><span class="name">${stageName}</span><span class="count">${days}d</span></div>
+              <div class="hist-bar-bg"><div class="hist-bar-fill" style="width:${days/maxDelayByStage*100}%"></div></div>
+            </div>
+          `).join('')}
+        </div>
+        <div>
+          <div class="rule-row-label" style="margin-bottom:8px">Delay-days by team</div>
+          ${Object.entries(delayByTeam).sort((a,b)=>b[1]-a[1]).map(([team,days])=>`
+            <div class="barchart-row"><div class="label">${team}</div><div class="barchart-track"><div class="barchart-seg" style="width:100%;background:var(--red)"></div></div><div class="barchart-count">${days}d</div></div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="rule-row-label" style="margin:16px 0 8px">Recent changes</div>
+      <table><thead><tr><th>Date</th><th>Project</th><th>Stage</th><th>Team</th><th>Old End</th><th>New End</th><th>\u0394</th></tr></thead><tbody>
+        ${recentDelays.map(e=>`
+          <tr>
+            <td class="mono">${fmtDate(e.date)}</td>
+            <td>${escapeHtml(e.projectName)}</td>
+            <td>${e.stageName}</td>
+            <td>${e.team}</td>
+            <td class="mono">${fmtDate(e.oldEnd)}</td>
+            <td class="mono">${fmtDate(e.newEnd)}</td>
+            <td class="mono" style="color:${e.deltaDays>0?'var(--red)':(e.deltaDays<0?'var(--green)':'var(--muted)')}">${e.deltaDays>0?'+':''}${e.deltaDays}d</td>
+          </tr>
+        `).join('')}
+      </tbody></table>
+      ` : `<p style="color:var(--muted);font-size:13px">No Live-schedule edits recorded yet.</p>`}
+    </div>
   `;
 }
 
@@ -2113,7 +2406,7 @@ function renderTeamLoad(){
     <div class="grid-2" style="margin-bottom:24px">
       ${Object.entries(teamStageMap).map(([team, stages])=>{
         const stageIds = stages.map(s=>s.id);
-        const ps = activeProjects().filter(p=>stageIds.includes(p.currentStageId));
+        const ps = activeProjects().filter(p=>p.currentStageIds.some(id=>stageIds.includes(id)));
         const totalLms = ps.reduce((a,p)=>a+p.lms,0);
         return `<div class="team-card">
           <div class="thead">
@@ -2412,6 +2705,14 @@ function renderSettings(){
             <div class="rule-row-label">Base business days</div>
             <input type="number" min="1" class="ruleBase" data-stage="${s.id}" value="${r.base}" style="width:90px">
 
+            <div class="rule-row-label" style="margin-top:12px">Applies to workflow</div>
+            <div class="rule-mult-grid rule-mult-grid-3">
+              ${WORKFLOWS.map(w=>`
+                <label class="msel-opt" style="padding:4px 0">
+                  <input type="checkbox" class="ruleAppliesTo" data-stage="${s.id}" data-workflow="${w}" ${r.appliesTo[w]!==false?'checked':''}> ${w}
+                </label>`).join('')}
+            </div>
+
             <div class="rule-row-label" style="margin-top:12px">Type multiplier</div>
             <div class="rule-mult-grid rule-mult-grid-3">
               ${PROJECT_TYPES.map(t=>`
@@ -2437,6 +2738,27 @@ function renderSettings(){
       </div>
       <p style="color:var(--muted);font-size:12px;margin-top:10px">Saving recalculates every project's stage schedule and Estimated EDD, unless a stage has an approved manual override in place.</p>
     </div>
+
+    <div class="panel settings-panel">
+      <div class="section-title">EM / PM List <span class="tag">used as the dropdown when adding or editing a project</span></div>
+      <p style="color:var(--muted);font-size:12.5px;margin:-6px 0 16px;line-height:1.6">Add, rename, or remove names here. Editing or removing a name doesn't change any project already assigned to it — projects always keep whatever name they were saved with, even if it's later removed from this list.</p>
+      <div id="emListRows">
+        ${STATE.emList.map((name,idx)=>`
+          <div class="stage-edit-row" style="grid-template-columns:1fr auto">
+            <input type="text" class="emListInput" data-idx="${idx}" value="${escapeHtml(name)}">
+            <button class="icon-btn" data-emremove="${idx}" title="Remove">✕</button>
+          </div>
+        `).join('')}
+        ${STATE.emList.length===0?`<p style="color:var(--muted-2);font-size:12.5px">No names yet — add one below.</p>`:''}
+      </div>
+      <div class="field-row" style="margin-top:14px;align-items:flex-end">
+        <div class="field" style="margin-bottom:0"><label>Add a name</label><input type="text" id="emListNewName" placeholder="e.g. Priya Natarajan"></div>
+        <button class="btn ghost" id="btnEmListAdd" style="height:38px">+ Add</button>
+      </div>
+      <div class="modal-foot" style="border-top:none;justify-content:flex-start;padding-top:16px">
+        <button class="btn primary" id="btnSaveEmList">Save EM/PM list</button>
+      </div>
+    </div>
   `;
   document.getElementById('btnSaveSettings').onclick = async ()=>{
     const proceed = await confirmDialog('This recalculates and re-saves every project\'s schedule. If a teammate has an edit in flight right now, this can overwrite it. Continue?', {okLabel:'Recalculate & Save'});
@@ -2444,6 +2766,10 @@ function renderSettings(){
     STAGES.forEach(s=>{
       const rule = STATE.config.stageRules[s.id];
       rule.base = parseInt(document.querySelector(`.ruleBase[data-stage="${s.id}"]`).value)||1;
+      rule.appliesTo = rule.appliesTo || {};
+      WORKFLOWS.forEach(w=>{
+        rule.appliesTo[w] = document.querySelector(`.ruleAppliesTo[data-stage="${s.id}"][data-workflow="${w}"]`).checked;
+      });
       rule.mult = rule.mult || {};
       PROJECT_TYPES.forEach(t=>{
         rule.mult[t] = parseFloat(document.querySelector(`.ruleMult[data-stage="${s.id}"][data-type="${t}"]`).value)||1;
@@ -2459,6 +2785,32 @@ function renderSettings(){
     const failed = await saveProjectsSequentially(STATE.projects, true);
     renderTeamLoad();
     showToast(`Settings saved and schedules recalculated for everyone.${failed.length?` ${failed.length} project(s) didn't save — try again in a moment.`:''}`, failed.length?'error':'success', 4000);
+  };
+
+  document.getElementById('btnEmListAdd').onclick = ()=>{
+    const input = document.getElementById('emListNewName');
+    const name = input.value.trim();
+    if(!name){ showToast('Enter a name first.', 'error'); return; }
+    if(STATE.emList.some(n=>n.toLowerCase()===name.toLowerCase())){ showToast(`"${name}" is already in the list.`, 'error'); return; }
+    STATE.emList.push(name);
+    renderSettings();
+  };
+  document.getElementById('emListNewName').onkeydown = (e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnEmListAdd').click(); } };
+  document.querySelectorAll('.emListInput').forEach(inp=>{
+    inp.onchange = ()=>{ STATE.emList[parseInt(inp.dataset.idx)] = inp.value.trim(); };
+  });
+  document.querySelectorAll('[data-emremove]').forEach(btn=>{
+    btn.onclick = ()=>{
+      STATE.emList.splice(parseInt(btn.dataset.emremove), 1);
+      renderSettings();
+    };
+  });
+  document.getElementById('btnSaveEmList').onclick = async ()=>{
+    document.querySelectorAll('.emListInput').forEach(inp=>{ STATE.emList[parseInt(inp.dataset.idx)] = inp.value.trim(); });
+    STATE.emList = STATE.emList.filter(Boolean);
+    const ok = await saveEmList();
+    if(ok) showToast('EM/PM list saved.', 'success');
+    renderSettings();
   };
 }
 
@@ -2496,9 +2848,12 @@ document.getElementById('btnRefreshNow').addEventListener('click', async ()=>{
   if(data.hasRules){
     STAGES.forEach(s=>{ if(data.rules[s.id]) STATE.config.stageRules[s.id]=data.rules[s.id]; if(data.teamMap[s.id]) STATE.config.teamMap[s.id]=data.teamMap[s.id]; });
   }
+  STATE.emList = data.emList;
   if(data.hasProjects){
     STATE.projects = data.projects;
     STATE.blockerHistory = data.history;
+    STATE.delayHistory = data.delayHistory;
+    if(!data.hasEmList) await saveEmList(); // persist the bootstrapped list so it's stable going forward
     if(data.failedProjectKeys && data.failedProjectKeys.length){
       showToast(`${data.failedProjectKeys.length} project(s) couldn't be loaded (storage read error). They still exist — click ↻ Refresh to try again.`, 'error', 6000);
     }
@@ -2506,6 +2861,8 @@ document.getElementById('btnRefreshNow').addEventListener('click', async ()=>{
     // First time anyone has opened this — seed the shared workspace once, one write at a time.
     const seedHistory = seed();
     if(!data.hasRules){ await saveAllRules(); }
+    STATE.emList = [...new Set(STATE.projects.map(p=>p.em))].sort();
+    await saveEmList();
     await saveProjectsSequentially(STATE.projects, true);
     try{ await withRetry(()=>window.storage.set('milepost:history', JSON.stringify(seedHistory), SHARED)); }catch(e){ console.log('Seed history save failed (non-critical, best-effort):', e && e.message); }
     STATE.blockerHistory = seedHistory;
