@@ -1,4 +1,4 @@
-import { sql, ensureTable } from '../../../../lib/db';
+import { sql } from '../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,11 +16,12 @@ function noCacheJson(body, init) {
 
 export async function GET(request) {
   try {
-    await ensureTable();
+    // Table is created once (see the /set route) — skipping the existence check here on the
+    // highest-frequency paths avoids an extra query on every single read.
     const { searchParams } = new URL(request.url);
     const prefix = searchParams.get('prefix') || '';
     const { rows } = await sql`
-      SELECT store_key FROM kv_store WHERE store_key LIKE ${prefix + '%'}
+      SELECT store_key FROM kv_store WHERE store_key LIKE ${prefix + '%'} ORDER BY store_key ASC
     `;
     return noCacheJson({ keys: rows.map(r => r.store_key) });
   } catch (e) {
