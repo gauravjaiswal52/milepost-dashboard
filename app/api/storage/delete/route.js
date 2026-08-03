@@ -1,4 +1,4 @@
-import { sql, ensureTable } from '../../../../lib/db';
+import { sql } from '../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,7 +16,8 @@ function noCacheJson(body, init) {
 
 export async function POST(request) {
   try {
-    await ensureTable();
+    // Table is created once (see the /set route) — skipping the existence check here on the
+    // highest-frequency paths avoids an extra query on every single read.
     const { key } = await request.json();
     if (!key) return noCacheJson({ error: 'Missing key' }, { status: 400 });
     await sql`DELETE FROM kv_store WHERE store_key = ${key}`;
