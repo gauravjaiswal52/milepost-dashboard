@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -458,6 +459,23 @@ window.storage = {
     if(data.value === null || data.value === undefined) return null;
     return { key, value: data.value };
   },
+  // Bulk read: one request for many keys instead of one request per key. loadAllData() checks
+  // for this method and uses it when present (this Vercel shim provides it; the Claude-artifact
+  // platform's native window.storage doesn't, so that environment transparently falls back to
+  // the one-at-a-time path instead).
+  async getMany(keys){
+    if(!keys || keys.length===0) return {};
+    const r = await fetch('/api/storage/getmany', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ keys })
+    });
+    if(!r.ok) throw new Error('Storage getmany failed: ' + r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    return data.values;
+  },
   async set(key, value, shared){
     const r = await fetch('/api/storage/set', {
       method: 'POST',
@@ -485,6 +503,7 @@ window.storage = {
 };
 </script>
 <script>
+
 /* ============================== CONFIG / CONSTANTS ============================== */
 const STAGES = [
   {id:'pre_correction', name:'Pre-Correction', abbr:'PC', team:'CSM', duration:3},
@@ -738,7 +757,15 @@ async function loadAllData(){
     });
   }
   const projectKeys = await listKeys('milepost:project:');
-  const loaded = await mapWithConcurrency(projectKeys, 6, async k=>getJson(k));
+  let loaded;
+  if(window.storage.getMany){
+    // Vercel deployment: one request for all N projects instead of N separate requests —
+    // this is the single biggest thing keeping this app cheap to run on a free hosting tier.
+    const bulk = await window.storage.getMany(projectKeys);
+    loaded = projectKeys.map(k => bulk && Object.prototype.hasOwnProperty.call(bulk, k) ? JSON.parse(bulk[k]) : (bulk && bulk.__readFailed ? {__readFailed:true} : null));
+  } else {
+    loaded = await mapWithConcurrency(projectKeys, 6, async k=>getJson(k));
+  }
   const projects = [];
   const failedProjectKeys = [];
   loaded.forEach((obj, i)=>{
@@ -912,7 +939,13 @@ function updateRefreshLabel(){
   const el = document.getElementById('refreshLabel');
   if(el && lastRefreshedAt) el.textContent = 'Synced ' + lastRefreshedAt.toLocaleTimeString();
 }
-setInterval(()=>{ if(!isBusy() && activeTab!=='settings') refreshAll(); }, 20000);
+// Refreshing less often, and not at all while the tab is in the background, meaningfully cuts
+// serverless-function invocation volume on a free hosting tier — a background tab polling every
+// 20 seconds all day adds up fast across a team, for zero benefit since nobody's looking at it.
+setInterval(()=>{ if(!document.hidden && !isBusy() && activeTab!=='settings') refreshAll(); }, 60000);
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && !isBusy() && activeTab!=='settings') refreshAll(); // catch up immediately on return, rather than waiting up to another 60s
+});
 
 /* ============================== SEED DATA ============================== */
 function seed(){
